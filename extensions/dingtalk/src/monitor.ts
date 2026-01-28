@@ -68,7 +68,7 @@ const DEDUP_CACHE_TTL = 5 * 60 * 1000;
 const processedMessageTimestamps = new Map<string, number>();
 
 /** 短 TTL 内容签名去重（毫秒） */
-const SIGNATURE_TTL_MS = 70 * 1000;
+const SIGNATURE_TTL_MS = 100 * 1000;
 
 /** 内容签名缓存条目（带时间戳） */
 const recentSignatureTimestamps = new Map<string, number>();
