@@ -2,6 +2,8 @@
 
 钉钉 (DingTalk) 渠道插件，为 Moltbot 提供钉钉消息接入能力。
 
+> 🚧 **即将支持**：直接通过 `npm install @moltbot-china/dingtalk` 安装，无需手动复制文件和修改配置。
+
 ## 实现状态
 
 ✅ **已完成的核心功能：**
@@ -34,7 +36,7 @@ cp -r extensions/dingtalk ~/.clawdbot/extensions/
 
 ### 2. 配置钉钉凭证
 
-在 Moltbot 配置文件中添加钉钉渠道配置：
+在 Moltbot 配置文件 `/root/.clawdbot/clawdbot.json` 中添加钉钉渠道配置：
 
 ```json5
 {
