@@ -61,6 +61,8 @@ export interface PluginRuntime {
       resolveMarkdownTableMode?: (params: { cfg: unknown; channel: string }) => unknown;
       convertMarkdownTables?: (text: string, mode: unknown) => string;
       chunkTextWithMode?: (text: string, limit: number, mode: unknown) => string[];
+      /** Markdown 感知的文本分块，不会在代码块中间断开 */
+      chunkMarkdownText?: (text: string, limit: number) => string[];
     };
   };
   system?: {
