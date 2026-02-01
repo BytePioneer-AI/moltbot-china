@@ -93,10 +93,12 @@
   },
   "dependencies": {
     "@openclaw-china/shared": "workspace:*",
-    "dingtalk-stream": "^2.1.4"
+    "dingtalk-stream": "^2.1.4",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
     "fast-check": "^3.22.0",
     "tsup": "^8.2.0",
     "typescript": "^5.7.0",

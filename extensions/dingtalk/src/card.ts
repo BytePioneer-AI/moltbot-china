@@ -264,7 +264,7 @@ export async function streamAICard(
 
   try {
     const streamResp = await fetch(`${DINGTALK_API_BASE}/v1.0/card/streaming`, {
-      method: "PUT",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-acs-dingtalk-access-token": card.accessToken,

@@ -477,9 +477,26 @@ export async function processLocalImagesInMarkdown(params: {
   text: string;
   cfg: DingtalkConfig;
   log?: Logger;
+  cache?: Map<string, string>;
 }): Promise<string> {
-  const { text, cfg, log } = params;
+  const { text, cfg, log, cache } = params;
   let result = text;
+  const mediaCache = cache ?? new Map<string, string>();
+
+  const getMediaId = async (localPath: string): Promise<string> => {
+    const cached = mediaCache.get(localPath);
+    if (cached) return cached;
+    const buffer = await fsPromises.readFile(localPath);
+    const fileName = path.basename(localPath);
+    const upload = await uploadMediaDingtalk({
+      cfg,
+      media: buffer,
+      fileName,
+      mediaType: "image",
+    });
+    mediaCache.set(localPath, upload.mediaId);
+    return upload.mediaId;
+  };
 
   const mdMatches = [...text.matchAll(LOCAL_IMAGE_RE)];
   if (mdMatches.length > 0) {
@@ -492,15 +509,8 @@ export async function processLocalImagesInMarkdown(params: {
         log?.warn?.(`[dingtalk] local image not found: ${localPath}`);
         continue;
       }
-      const buffer = await fsPromises.readFile(localPath);
-      const fileName = path.basename(localPath);
-      const upload = await uploadMediaDingtalk({
-        cfg,
-        media: buffer,
-        fileName,
-        mediaType: "image",
-      });
-      result = result.replace(fullMatch, `![${alt}](${upload.mediaId})`);
+      const mediaId = await getMediaId(localPath);
+      result = result.replace(fullMatch, `![${alt}](${mediaId})`);
     }
   }
 
@@ -520,15 +530,8 @@ export async function processLocalImagesInMarkdown(params: {
         log?.warn?.(`[dingtalk] local image not found: ${localPath}`);
         continue;
       }
-      const buffer = await fsPromises.readFile(localPath);
-      const fileName = path.basename(localPath);
-      const upload = await uploadMediaDingtalk({
-        cfg,
-        media: buffer,
-        fileName,
-        mediaType: "image",
-      });
-      const replacement = `![](${upload.mediaId})`;
+      const mediaId = await getMediaId(localPath);
+      const replacement = `![](${mediaId})`;
       result = result.slice(0, match.index!) + result.slice(match.index!).replace(fullMatch, replacement);
     }
   }

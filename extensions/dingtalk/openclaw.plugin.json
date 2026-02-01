@@ -18,11 +18,19 @@
       "allowFrom": { "type": "array", "items": { "type": "string" } },
       "groupAllowFrom": { "type": "array", "items": { "type": "string" } },
       "historyLimit": { "type": "integer", "minimum": 0 },
-      "textChunkLimit": { "type": "integer", "minimum": 1 }
+      "textChunkLimit": { "type": "integer", "minimum": 1 },
+      "enableAICard": { "type": "boolean" },
+      "gatewayToken": { "type": "string" },
+      "gatewayPassword": { "type": "string" },
+      "streamSource": { "type": "string", "enum": ["gateway-sse", "gateway-ws"] },
+      "gatewayWsUrl": { "type": "string" },
+      "maxFileSizeMB": { "type": "number", "minimum": 1 }
     }
   },
   "uiHints": {
     "clientId": { "label": "Client ID (AppKey)" },
-    "clientSecret": { "label": "Client Secret (AppSecret)", "sensitive": true }
+    "clientSecret": { "label": "Client Secret (AppSecret)", "sensitive": true },
+    "gatewayToken": { "label": "Gateway Token", "sensitive": true },
+    "gatewayPassword": { "label": "Gateway Password", "sensitive": true }
   }
 }

@@ -44,6 +44,9 @@ moltbot-china/
 │           │   ├── index.ts
 │           │   ├── client.ts
 │           │   └── retry.ts
+│           ├── file/                # 文件工具
+│           │   ├── index.ts
+│           │   └── file-utils.ts
 │           └── types/
 │               └── common.ts
 │
