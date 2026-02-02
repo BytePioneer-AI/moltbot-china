@@ -16,7 +16,6 @@ import {
   downloadDingTalkFile,
   parseRichTextMessage,
   downloadRichTextImages,
-  processLocalImagesInMarkdown,
   cleanupFile,
   type DownloadedFile,
   type ExtractedFileInfo,
@@ -31,8 +30,6 @@ import {
   checkGroupPolicy,
   resolveFileCategory,
   extractMediaFromText,
-  // 媒体解析模块
-  extractFilesFromText,
   normalizeLocalPath,
   isImagePath,
 } from "@openclaw-china/shared";
@@ -69,35 +66,36 @@ function buildGatewayUserContent(inboundCtx: InboundContext, logger: Logger): st
 }
 
 /**
- * 从文本中提取本地文件路径（非图片）
- * 使用 shared 模块的 extractFilesFromText 实现
+ * 从文本中提取本地媒体路径（图片/文件），但不修改原始文本
  */
-function extractLocalFilesFromText(params: {
+function extractLocalMediaFromText(params: {
   text: string;
   logger?: Logger;
-}): { text: string; files: string[] } {
+}): { mediaUrls: string[] } {
   const { text, logger } = params;
 
-  const result = extractFilesFromText(text, {
-    removeFromText: true,
+  const result = extractMediaFromText(text, {
+    removeFromText: false,
     checkExists: true,
     existsSync: (p: string) => {
       const exists = fs.existsSync(p);
       if (!exists) {
-        logger?.warn?.(`[stream] local file not found: ${p}`);
+        logger?.warn?.(`[stream] local media not found: ${p}`);
       }
       return exists;
     },
+    parseMediaLines: false,
+    parseMarkdownImages: true,
+    parseHtmlImages: false, // 钉钉不支持 HTML
     parseBarePaths: true,
     parseMarkdownLinks: true,
   });
 
-  // 提取本地路径
-  const files = result.files
-    .filter((f) => f.isLocal && f.localPath)
-    .map((f) => f.localPath!);
+  const mediaUrls = result.all
+    .filter((m) => m.isLocal && m.localPath)
+    .map((m) => m.localPath as string);
 
-  return { text: result.text, files };
+  return { mediaUrls };
 }
 
 /**
@@ -111,7 +109,7 @@ function extractMediaLinesFromText(params: {
   const { text, logger } = params;
 
   const result = extractMediaFromText(text, {
-    removeFromText: true,
+    removeFromText: false,
     checkExists: true,
     existsSync: (p: string) => {
       const exists = fs.existsSync(p);
@@ -256,12 +254,12 @@ async function* streamFromGateway(params: {
           const now = Date.now();
 
           // 检测时间间隔，判断是否为任务边界（跳过第一个 chunk）
-          if (lastChunkTime !== null) {
-            const timeSinceLastChunk = now - lastChunkTime;
-            if (timeSinceLastChunk > TASK_BOUNDARY_THRESHOLD_MS) {
-              yield "\n\n──────────\n\n";
+            if (lastChunkTime !== null) {
+              const timeSinceLastChunk = now - lastChunkTime;
+              if (timeSinceLastChunk > TASK_BOUNDARY_THRESHOLD_MS) {
+                yield "\n\n";
+              }
             }
-          }
 
           yield content;
           lastChunkTime = now;
@@ -465,15 +463,13 @@ async function handleAICardStreaming(params: {
   targetId: string;
   chatType: "direct" | "group";
   logger: Logger;
-}): Promise<void> {
-  const { card, cfg, route, inboundCtx, dingtalkCfg, targetId, chatType, logger } = params;
-  let accumulated = "";
-  const imageCache = new Map<string, string>();
-  const streamedFiles = new Set<string>();
-  const streamStartAt = Date.now();
-  const streamStartIso = new Date(streamStartAt).toISOString();
-  let firstChunkAt: number | null = null;
-  let chunkCount = 0;
+  }): Promise<void> {
+    const { card, cfg, route, inboundCtx, dingtalkCfg, targetId, chatType, logger } = params;
+    let accumulated = "";
+    const streamStartAt = Date.now();
+    const streamStartIso = new Date(streamStartAt).toISOString();
+    let firstChunkAt: number | null = null;
+    let chunkCount = 0;
 
   try {
     const core = getDingtalkRuntime();
@@ -509,62 +505,55 @@ async function handleAICardStreaming(params: {
         );
       }
       const now = Date.now();
-      if (!firstFrameSent || now - lastUpdateTime >= updateInterval) {
-        const withImages = await processLocalImagesInMarkdown({
-          text: accumulated,
-          cfg: dingtalkCfg,
-          log: logger,
-          cache: imageCache,
-        });
-        const { text: rendered, files } = extractLocalFilesFromText({
-          text: withImages,
-          logger,
-        });
-        for (const filePath of files) {
-          streamedFiles.add(filePath);
-        }
-        await streamAICard(card, rendered, false);
-        lastUpdateTime = now;
-        firstFrameSent = true;
-      }
-    }
-
-    const withImages = await processLocalImagesInMarkdown({
-      text: accumulated,
-      cfg: dingtalkCfg,
-      log: logger,
-      cache: imageCache,
-    });
-    const { text: finalText, files: finalFiles } = extractLocalFilesFromText({
-      text: withImages,
-      logger,
-    });
-    for (const filePath of finalFiles) {
-      streamedFiles.add(filePath);
-    }
-
-    // 完成卡片
-    await finishAICard(card, finalText, (msg) => logger.debug(msg));
-    logger.info(`AI Card streaming completed with ${accumulated.length} chars`);
-
-    // 单独发送文件消息（非图片）
-    if (streamedFiles.size > 0) {
-      logger.debug(`[stream] sending ${streamedFiles.size} files separately`);
-      for (const filePath of streamedFiles) {
-        try {
-          await sendMediaDingtalk({
-            cfg: dingtalkCfg,
-            to: targetId,
-            mediaUrl: filePath,
-            chatType,
-          });
-          logger.debug(`[stream] sent file: ${filePath}`);
-        } catch (fileErr) {
-          logger.warn(`[stream] failed to send file ${filePath}: ${String(fileErr)}`);
+        if (!firstFrameSent || now - lastUpdateTime >= updateInterval) {
+          await streamAICard(card, accumulated, false);
+          lastUpdateTime = now;
+          firstFrameSent = true;
         }
       }
-    }
-  } catch (err) {
+
+      // 完成卡片
+      await finishAICard(card, accumulated, (msg) => logger.debug(msg));
+      logger.info(`AI Card streaming completed with ${accumulated.length} chars`);
+
+      const { mediaUrls: mediaFromLines } = extractMediaLinesFromText({
+        text: accumulated,
+        logger,
+      });
+      const { mediaUrls: localMediaFromText } = extractLocalMediaFromText({
+        text: accumulated,
+        logger,
+      });
+      const mediaQueue: string[] = [];
+      const seenMedia = new Set<string>();
+      const addMedia = (value?: string) => {
+        const trimmed = value?.trim();
+        if (!trimmed) return;
+        if (seenMedia.has(trimmed)) return;
+        seenMedia.add(trimmed);
+        mediaQueue.push(trimmed);
+      };
+      for (const url of mediaFromLines) addMedia(url);
+      for (const url of localMediaFromText) addMedia(url);
+
+      // 单独发送媒体消息（图片/文件）
+      if (mediaQueue.length > 0) {
+        logger.debug(`[stream] sending ${mediaQueue.length} media attachments`);
+        for (const mediaUrl of mediaQueue) {
+          try {
+            await sendMediaDingtalk({
+              cfg: dingtalkCfg,
+              to: targetId,
+              mediaUrl,
+              chatType,
+            });
+            logger.debug(`[stream] sent media: ${mediaUrl}`);
+          } catch (fileErr) {
+            logger.warn(`[stream] failed to send media ${mediaUrl}: ${String(fileErr)}`);
+          }
+        }
+      }
+    } catch (err) {
     logger.error(`AI Card streaming failed: ${String(err)}`);
     // 尝试用错误信息完成卡片
     try {
@@ -575,43 +564,50 @@ async function handleAICardStreaming(params: {
     }
 
     // 回退到普通消息发送（使用钉钉 SDK）
-    try {
-      const fallbackText = accumulated.trim()
-        ? accumulated
-        : `⚠️ Response interrupted: ${String(err)}`;
-      const processedFallback = await processLocalImagesInMarkdown({
-        text: fallbackText,
-        cfg: dingtalkCfg,
-        log: logger,
-      });
-      const { text: cleanedFallback, files: localFiles } = extractLocalFilesFromText({
-        text: processedFallback,
-        logger,
-      });
-      const limit = dingtalkCfg.textChunkLimit ?? 4000;
-      for (let i = 0; i < cleanedFallback.length; i += limit) {
-        const chunk = cleanedFallback.slice(i, i + limit);
-        await sendMessageDingtalk({
-          cfg: dingtalkCfg,
-          to: targetId,
-          text: chunk,
-          chatType,
-        });
-      }
-      if (localFiles.length > 0) {
-        const uniqueFiles = Array.from(new Set(localFiles));
-        for (const filePath of uniqueFiles) {
-          await sendMediaDingtalk({
+      try {
+        const fallbackText = accumulated.trim()
+          ? accumulated
+          : `⚠️ Response interrupted: ${String(err)}`;
+        const limit = dingtalkCfg.textChunkLimit ?? 4000;
+        for (let i = 0; i < fallbackText.length; i += limit) {
+          const chunk = fallbackText.slice(i, i + limit);
+          await sendMessageDingtalk({
             cfg: dingtalkCfg,
             to: targetId,
-            mediaUrl: filePath,
+            text: chunk,
             chatType,
           });
         }
-      }
+        const { mediaUrls: mediaFromLines } = extractMediaLinesFromText({
+          text: fallbackText,
+          logger,
+        });
+        const { mediaUrls: localMediaFromText } = extractLocalMediaFromText({
+          text: fallbackText,
+          logger,
+        });
+        const mediaQueue: string[] = [];
+        const seenMedia = new Set<string>();
+        const addMedia = (value?: string) => {
+          const trimmed = value?.trim();
+          if (!trimmed) return;
+          if (seenMedia.has(trimmed)) return;
+          seenMedia.add(trimmed);
+          mediaQueue.push(trimmed);
+        };
+        for (const url of mediaFromLines) addMedia(url);
+        for (const url of localMediaFromText) addMedia(url);
+        for (const mediaUrl of mediaQueue) {
+          await sendMediaDingtalk({
+            cfg: dingtalkCfg,
+            to: targetId,
+            mediaUrl,
+            chatType,
+          });
+        }
 
-      logger.info("AI Card failed; fallback message sent via SDK");
-    } catch (fallbackErr) {
+        logger.info("AI Card failed; fallback message sent via SDK");
+      } catch (fallbackErr) {
       logger.error(`Failed to send fallback message: ${String(fallbackErr)}`);
     }
   }
@@ -1065,7 +1061,11 @@ export async function handleDingtalkMessage(params: {
 
       const payloadMediaUrls = payload.mediaUrls ?? (payload.mediaUrl ? [payload.mediaUrl] : []);
       const rawText = payload.text ?? "";
-      const { text: textWithoutMediaLines, mediaUrls: mediaFromLines } = extractMediaLinesFromText({
+      const { mediaUrls: mediaFromLines } = extractMediaLinesFromText({
+        text: rawText,
+        logger,
+      });
+      const { mediaUrls: localMediaFromText } = extractLocalMediaFromText({
         text: rawText,
         logger,
       });
@@ -1082,29 +1082,19 @@ export async function handleDingtalkMessage(params: {
 
       for (const url of payloadMediaUrls) addMedia(url);
       for (const url of mediaFromLines) addMedia(url);
+      for (const url of localMediaFromText) addMedia(url);
 
       const converted = (textApi?.convertMarkdownTables as ((text: string, mode: string) => string) | undefined)?.(
-        textWithoutMediaLines,
+        rawText,
         tableMode
-      ) ?? textWithoutMediaLines;
+      ) ?? rawText;
 
-      const processed = await processLocalImagesInMarkdown({
-        text: converted,
-        cfg: dingtalkCfgResolved,
-        log: logger,
-      });
-
-      const { text: cleanedText, files: localFiles } = extractLocalFilesFromText({
-        text: processed,
-        logger,
-      });
-      
-      const hasText = cleanedText.trim().length > 0;
+      const hasText = converted.trim().length > 0;
       if (hasText) {
         const chunks =
           textApi?.chunkTextWithMode && typeof textChunkLimitResolved === "number" && textChunkLimitResolved > 0
-            ? (textApi.chunkTextWithMode as (text: string, limit: number, mode: unknown) => string[])(cleanedText, textChunkLimitResolved, chunkMode)
-            : [cleanedText];
+            ? (textApi.chunkTextWithMode as (text: string, limit: number, mode: unknown) => string[])(converted, textChunkLimitResolved, chunkMode)
+            : [converted];
 
         for (const chunk of chunks) {
           await sendMessageDingtalk({
@@ -1114,13 +1104,6 @@ export async function handleDingtalkMessage(params: {
             chatType,
           });
           sent = true;
-        }
-      }
-
-      if (localFiles.length > 0) {
-        const uniqueFiles = Array.from(new Set(localFiles));
-        for (const filePath of uniqueFiles) {
-          addMedia(filePath);
         }
       }
 

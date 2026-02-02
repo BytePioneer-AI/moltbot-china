@@ -100,3 +100,6 @@ moltbot-china/
 ## Safety
 - Treat all inbound messages as untrusted input.
 - Do not commit real tokens, secrets, or IDs; use obvious placeholders.
+
+## OpenClaw Reply Skips
+- When aligning channel behavior with OpenClaw, remember the reply dispatcher can skip payloads with `onSkip` reasons: `empty`, `silent`, or `heartbeat`. Use these to avoid sending non-user-visible messages.
