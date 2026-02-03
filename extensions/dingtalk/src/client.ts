@@ -16,8 +16,6 @@ import { resolveDingtalkCredentials, type DingtalkConfig } from "./config.js";
 interface DingtalkClientOptions {
   clientId: string;
   clientSecret: string;
-  /** Enable SDK ping/pong heartbeat */
-  keepAlive?: boolean;
   /** Optional UA label for DingTalk gateway */
   ua?: string;
 }
@@ -50,7 +48,6 @@ export function createDingtalkClient(opts: DingtalkClientOptions): DWClient {
   const client = new DWClient({
     clientId: opts.clientId,
     clientSecret: opts.clientSecret,
-    ...(opts.keepAlive !== undefined ? { keepAlive: opts.keepAlive } : {}),
     ...(opts.ua ? { ua: opts.ua } : {}),
   });
 
@@ -78,8 +75,6 @@ export function createDingtalkClientFromConfig(cfg: DingtalkConfig): DWClient {
   }
   return createDingtalkClient({
     ...creds,
-    // Enable heartbeat so idle connections get terminated if the server stops responding.
-    keepAlive: true,
     ua: "openclaw-dingtalk",
   });
 }
