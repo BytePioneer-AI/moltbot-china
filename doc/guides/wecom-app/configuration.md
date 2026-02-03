@@ -201,7 +201,12 @@ openclaw config set channels.wecom-app.agentId 1000002
       "encodingAESKey": "your-43-char-encoding-aes-key",
       "corpId": "your-corp-id",
       "corpSecret": "your-app-secret",
-      "agentId": 1000002
+      "agentId": 1000002,
+      "inboundMedia": {
+        "enabled": true,
+        "maxBytes": 10485760,
+        "keepDays": 7
+      }
     }
   }
 }
@@ -219,6 +224,10 @@ openclaw config set channels.wecom-app.agentId 1000002
 | `corpSecret`     |  ✅  | 应用的 Secret                                   |
 | `agentId`        |  ✅  | 应用的 AgentId                                  |
 | `welcomeText`    |  ❌  | 用户首次进入时的欢迎语                          |
+| `inboundMedia.enabled`  |  ❌  | 是否启用入站媒体落盘（默认启用）                |
+| `inboundMedia.dir`      |  ❌  | 入站媒体归档目录（跨平台默认：`~/.openclaw/media/wecom-app/inbound`） |
+| `inboundMedia.maxBytes` |  ❌  | 单个入站媒体最大字节数（默认 10MB）             |
+| `inboundMedia.keepDays` |  ❌  | 入站媒体保留天数（默认 7 天；用于自动清理）     |
 
 ---
 
@@ -256,6 +265,27 @@ openclaw gateway restart
 ![微信插件](image/configuration/1770110656555.png)
 
 用个人微信扫码「邀请关注」的二维码就可以在个人微信上打开入口
+
+---
+
+## 入站媒体（图片/语音/文件）落盘说明
+
+为了支持图片 OCR、回发原图、以及排查问题，wecom-app 会把入站媒体文件落盘保存。
+
+- 文件会被归档到：`inboundMedia.dir/YYYY-MM-DD/`
+- 消息正文里会显示：`[image] saved:<本地路径>`（该路径为稳定归档路径，便于后续处理）
+- 自动清理由 `inboundMedia.keepDays` 控制（默认 7 天）
+
+**为什么还会用 tmp 中转？**
+
+内部会先下载到系统临时目录，再原子移动到归档目录，以避免“半文件/下载失败”污染归档目录。
+
+**跨平台默认路径**
+
+- Linux/macOS：`~/.openclaw/media/wecom-app/inbound`
+- Windows：`%USERPROFILE%\.openclaw\media\wecom-app\inbound`
+
+如需自定义，请设置：`channels.wecom-app.inboundMedia.dir`
 
 ---
 
