@@ -1285,10 +1285,34 @@ export async function downloadAndSendFile(
     const { buffer: fileBuffer, contentType } = await downloadFile(fileUrl);
     console.log(`[wecom-app] File downloaded, size: ${fileBuffer.length} bytes, contentType: ${contentType || 'unknown'}`);
 
-    // 2. 提取文件扩展名
-    const extMatch = fileUrl.match(/\.([^.]+)$/);
-    const ext = extMatch ? `.${extMatch[1]}` : '.bin';
-    const filename = `file${ext}`;
+    // 2. 尽量保留原始文件名（本地路径 / URL path），否则回退为 file.<ext>
+    //    注意：企业微信这里更关注 media_id，但保留文件名能提升用户体验。
+    let filename = "file.bin";
+
+    try {
+      // 本地路径：取 basename
+      if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+        const path = await import('path');
+        const base = path.basename(fileUrl);
+        if (base && base !== '.' && base !== '/') {
+          filename = base;
+        }
+      } else {
+        // URL：取 pathname 的 basename
+        const u = new URL(fileUrl);
+        const base = u.pathname.split('/').filter(Boolean).pop();
+        if (base) filename = base;
+      }
+    } catch {
+      // ignore and fallback
+    }
+
+    // 如果没拿到扩展名，按 url/path 推断一个
+    if (!/\.[A-Za-z0-9]{1,10}$/.test(filename)) {
+      const extMatch = fileUrl.split('?')[0].match(/\.([^.]+)$/);
+      const ext = extMatch ? `.${extMatch[1]}` : '.bin';
+      filename = `file${ext}`;
+    }
 
     // 3. 上传获取 media_id
     console.log(`[wecom-app] Uploading file to WeCom media API, filename: ${filename}`);
