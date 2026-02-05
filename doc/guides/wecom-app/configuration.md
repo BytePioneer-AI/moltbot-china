@@ -32,7 +32,8 @@
 
 ### 对话效果
 
-<img src="image/configuration/1770107297696.png" width="50%" />
+<img src="image/configuration/1770107297696.png" width="48%" />
+<img src="image/configuration/1770273261225.png" width="48%" />
 
 </div>
 
@@ -214,20 +215,20 @@ openclaw config set channels.wecom-app.agentId 1000002
 
 ### 配置说明
 
-| 字段               | 必填 | 说明                                            |
-| :----------------- | :--: | :---------------------------------------------- |
-| `enabled`        |  ✅  | 是否启用该渠道                                  |
-| `webhookPath`    |  ✅  | 回调路径，需与企业微信后台配置一致              |
-| `token`          |  ✅  | 消息校验 Token，需与企业微信后台配置一致        |
-| `encodingAESKey` |  ✅  | 消息加密密钥（43 位），需与企业微信后台配置一致 |
-| `corpId`         |  ✅  | 企业 ID                                         |
-| `corpSecret`     |  ✅  | 应用的 Secret                                   |
-| `agentId`        |  ✅  | 应用的 AgentId                                  |
-| `welcomeText`    |  ❌  | 用户首次进入时的欢迎语                          |
-| `inboundMedia.enabled`  |  ❌  | 是否启用入站媒体落盘（默认启用）                |
+| 字段                      | 必填 | 说明                                                                    |
+| :------------------------ | :--: | :---------------------------------------------------------------------- |
+| `enabled`               |  ✅  | 是否启用该渠道                                                          |
+| `webhookPath`           |  ✅  | 回调路径，需与企业微信后台配置一致                                      |
+| `token`                 |  ✅  | 消息校验 Token，需与企业微信后台配置一致                                |
+| `encodingAESKey`        |  ✅  | 消息加密密钥（43 位），需与企业微信后台配置一致                         |
+| `corpId`                |  ✅  | 企业 ID                                                                 |
+| `corpSecret`            |  ✅  | 应用的 Secret                                                           |
+| `agentId`               |  ✅  | 应用的 AgentId                                                          |
+| `welcomeText`           |  ❌  | 用户首次进入时的欢迎语                                                  |
+| `inboundMedia.enabled`  |  ❌  | 是否启用入站媒体落盘（默认启用）                                        |
 | `inboundMedia.dir`      |  ❌  | 入站媒体归档目录（跨平台默认：`~/.openclaw/media/wecom-app/inbound`） |
-| `inboundMedia.maxBytes` |  ❌  | 单个入站媒体最大字节数（默认 10MB）             |
-| `inboundMedia.keepDays` |  ❌  | 入站媒体保留天数（默认 7 天；用于自动清理）     |
+| `inboundMedia.maxBytes` |  ❌  | 单个入站媒体最大字节数（默认 10MB）                                     |
+| `inboundMedia.keepDays` |  ❌  | 入站媒体保留天数（默认 7 天；用于自动清理）                             |
 
 ---
 
@@ -410,6 +411,7 @@ cp -a /path/to/openclaw-china/extensions/wecom-app/skills/wecom-app-ops ~/.openc
 本插件当前已实现/覆盖：
 
 ### 入站（接收消息）
+
 - Webhook 接收回调
 - 签名校验 + 解密/加密回包
 - 支持 **JSON + XML** 两种入站格式
@@ -419,9 +421,9 @@ cp -a /path/to/openclaw-china/extensions/wecom-app/skills/wecom-app-ops ~/.openc
 ### 入站媒体（产品级留存）
 
 **Why / 设计动机**
+
 - 产品化目标是“消息里的 `saved:` 路径可长期复用”，而不是依赖 `/tmp` 这类易被清理的短期目录。
 - 这样 OCR/MCP、二次回发、归档/审计等流程才不会因为文件丢失而不稳定。
-
 - 支持 `image` / `voice` / `file` / `mixed`
 - 优先通过 `MediaId` 下载媒体；必要时回退 URL（如图片 PicUrl）
 - 媒体落盘：先 tmp 中转，再归档到 `inboundMedia.dir/YYYY-MM-DD/`
@@ -430,11 +432,13 @@ cp -a /path/to/openclaw-china/extensions/wecom-app/skills/wecom-app-ops ~/.openc
 - 大小限制：按 `inboundMedia.maxBytes` 限制单文件大小
 
 ### 出站（主动发送）
+
 - 支持主动发送文本
 - 支持主动发送媒体（按 MIME/扩展名识别 image/voice/file）
 - Markdown 降级：`stripMarkdown()` 将 Markdown 转为企业微信可显示的纯文本
 
 ### 目标解析与路由
+
 - 支持多种 target 输入格式：
   - `wecom-app:user:<id>` / `wecom-app:group:<id>`
   - `user:<id>` / `group:<id>`
@@ -442,6 +446,7 @@ cp -a /path/to/openclaw-china/extensions/wecom-app/skills/wecom-app-ops ~/.openc
   - `xxx@accountId`（带账号选择）
 
 ### 多账号与策略
+
 - 支持 `defaultAccount` + `accounts` 多账号
 - DM 策略：`dmPolicy`（open/pairing/allowlist/disabled）
 - 群策略：`groupPolicy`（open/allowlist/disabled）
