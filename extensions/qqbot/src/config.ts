@@ -22,6 +22,8 @@ export const QQBotConfigSchema = z.object({
   historyLimit: z.number().int().min(0).optional().default(10),
   textChunkLimit: z.number().int().positive().optional().default(1500),
   replyFinalOnly: z.boolean().optional().default(false),
+  maxFileSizeMB: z.number().positive().optional().default(100),
+  mediaTimeoutMs: z.number().int().positive().optional().default(30000),
 });
 
 export type QQBotConfig = z.infer<typeof QQBotConfigSchema>;

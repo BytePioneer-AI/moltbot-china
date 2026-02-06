@@ -2,6 +2,15 @@
 
 本指南帮助你在企业微信中创建自建应用，并配置 OpenClaw 接入。
 
+<div align="center">
+
+  <p>
+    <strong>⭐ 如果这个项目对你有帮助，请给我们一个Star！⭐</strong><br>
+    <em>您的支持是我们持续改进的动力</em>
+  </p>
+
+</div>
+
 ## 自建应用 vs 智能机器人
 
 | 功能            | 智能机器人 (wecom) | 自建应用 (wecom-app) |

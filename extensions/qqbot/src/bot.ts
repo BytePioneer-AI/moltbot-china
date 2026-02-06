@@ -5,15 +5,22 @@
 import {
   checkDmPolicy,
   checkGroupPolicy,
+  cleanupFileSafe,
   createLogger,
+  downloadToTempFile,
   type Logger,
   appendCronHiddenPrompt,
   extractMediaFromText,
+  isImagePath,
 } from "@openclaw-china/shared";
 import { QQBotConfigSchema, type QQBotConfig } from "./config.js";
 import { qqbotOutbound } from "./outbound.js";
 import { getQQBotRuntime } from "./runtime.js";
-import type { InboundContext, QQInboundMessage } from "./types.js";
+import type {
+  InboundContext,
+  QQInboundAttachment,
+  QQInboundMessage,
+} from "./types.js";
 import * as fs from "node:fs";
 
 type DispatchParams = {
@@ -42,20 +49,167 @@ function toNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function toNonNegativeNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  if (value < 0) return undefined;
+  return value;
+}
+
+function normalizeAttachmentUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return trimmed;
+}
+
+function parseAttachments(payload: Record<string, unknown>): QQInboundAttachment[] {
+  const raw = payload.attachments;
+  if (!Array.isArray(raw)) return [];
+
+  const items: QQInboundAttachment[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const data = entry as Record<string, unknown>;
+    const url = normalizeAttachmentUrl(data.url);
+    if (!url) continue;
+    items.push({
+      url,
+      filename: toString(data.filename),
+      contentType: toString(data.content_type),
+      size: toNonNegativeNumber(data.size),
+    });
+  }
+  return items;
+}
+
+function parseTextWithAttachments(payload: Record<string, unknown>): {
+  text: string;
+  attachments: QQInboundAttachment[];
+} {
+  const rawContent = typeof payload.content === "string" ? payload.content : "";
+  const attachments = parseAttachments(payload);
+  return {
+    text: rawContent.trim(),
+    attachments,
+  };
+}
+
+type ResolvedInboundAttachment = {
+  attachment: QQInboundAttachment;
+  localImagePath?: string;
+};
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function isImageAttachment(att: QQInboundAttachment): boolean {
+  const contentType = att.contentType?.trim().toLowerCase() ?? "";
+  if (contentType.startsWith("image/")) {
+    return true;
+  }
+
+  if (att.filename && isImagePath(att.filename)) {
+    return true;
+  }
+
+  try {
+    return isImagePath(new URL(att.url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+function scheduleTempCleanup(filePath: string): void {
+  const timer = setTimeout(() => {
+    void cleanupFileSafe(filePath);
+  }, 20 * 60 * 1000);
+  timer.unref?.();
+}
+
+async function resolveInboundAttachmentsForAgent(params: {
+  attachments?: QQInboundAttachment[];
+  qqCfg: QQBotConfig;
+  logger: Logger;
+}): Promise<ResolvedInboundAttachment[]> {
+  const { attachments, qqCfg, logger } = params;
+  const list = attachments ?? [];
+  if (list.length === 0) return [];
+
+  const timeout = qqCfg.mediaTimeoutMs ?? 30000;
+  const maxFileSizeMB = qqCfg.maxFileSizeMB ?? 100;
+  const maxSize = Math.floor(maxFileSizeMB * 1024 * 1024);
+
+  const resolved: ResolvedInboundAttachment[] = [];
+  for (const att of list) {
+    const next: ResolvedInboundAttachment = { attachment: att };
+    if (isImageAttachment(att) && isHttpUrl(att.url)) {
+      try {
+        const downloaded = await downloadToTempFile(att.url, {
+          timeout,
+          maxSize,
+          sourceFileName: att.filename,
+          tempPrefix: "qqbot-inbound",
+        });
+        next.localImagePath = downloaded.path;
+        logger.info(`inbound image cached: ${downloaded.path}`);
+        scheduleTempCleanup(downloaded.path);
+      } catch (err) {
+        logger.warn(`failed to download inbound attachment: ${String(err)}`);
+      }
+    }
+    resolved.push(next);
+  }
+  return resolved;
+}
+
+function buildInboundContentWithAttachments(params: {
+  content: string;
+  attachments?: ResolvedInboundAttachment[];
+}): string {
+  const { content, attachments } = params;
+  const list = attachments ?? [];
+  if (list.length === 0) return content;
+
+  const imageRefs = list
+    .map((item) => item.localImagePath)
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => `[Image: source: ${value}]`);
+
+  const lines = list.map((item, index) => {
+    const att = item.attachment;
+    const filename = att.filename?.trim() ? att.filename.trim() : `attachment-${index + 1}`;
+    const meta = [att.contentType, typeof att.size === "number" ? `${att.size} bytes` : undefined]
+      .filter((v): v is string => Boolean(v))
+      .join(", ");
+    const tail = item.localImagePath ? "[local image attached]" : att.url;
+    return meta ? `- ${filename} (${meta}): ${tail}` : `- ${filename}: ${tail}`;
+  });
+  const block = ["[QQ attachments]", ...lines].join("\n");
+
+  const parts: string[] = [];
+  if (content) parts.push(content);
+  if (imageRefs.length > 0) parts.push(imageRefs.join("\n"));
+  parts.push(block);
+  return parts.join("\n\n");
+}
+
 function parseC2CMessage(data: unknown): QQInboundMessage | null {
   const payload = data as Record<string, unknown>;
-  const content = toString(payload.content);
+  const { text, attachments } = parseTextWithAttachments(payload);
   const id = toString(payload.id);
   const timestamp = toNumber(payload.timestamp) ?? Date.now();
   const author = (payload.author ?? {}) as Record<string, unknown>;
   const senderId = toString(author.user_openid);
-  if (!content || !id || !senderId) return null;
+  if ((!text && attachments.length === 0) || !id || !senderId) return null;
 
   return {
     type: "direct",
     senderId,
     senderName: toString(author.username),
-    content,
+    content: text,
+    attachments: attachments.length > 0 ? attachments : undefined,
     messageId: id,
     timestamp,
     mentionedBot: false,
@@ -64,19 +218,20 @@ function parseC2CMessage(data: unknown): QQInboundMessage | null {
 
 function parseGroupMessage(data: unknown): QQInboundMessage | null {
   const payload = data as Record<string, unknown>;
-  const content = toString(payload.content);
+  const { text, attachments } = parseTextWithAttachments(payload);
   const id = toString(payload.id);
   const timestamp = toNumber(payload.timestamp) ?? Date.now();
   const groupOpenid = toString(payload.group_openid);
   const author = (payload.author ?? {}) as Record<string, unknown>;
   const senderId = toString(author.member_openid);
-  if (!content || !id || !senderId || !groupOpenid) return null;
+  if ((!text && attachments.length === 0) || !id || !senderId || !groupOpenid) return null;
 
   return {
     type: "group",
     senderId,
     senderName: toString(author.nickname) ?? toString(author.username),
-    content,
+    content: text,
+    attachments: attachments.length > 0 ? attachments : undefined,
     messageId: id,
     timestamp,
     groupOpenid,
@@ -86,20 +241,21 @@ function parseGroupMessage(data: unknown): QQInboundMessage | null {
 
 function parseChannelMessage(data: unknown): QQInboundMessage | null {
   const payload = data as Record<string, unknown>;
-  const content = toString(payload.content);
+  const { text, attachments } = parseTextWithAttachments(payload);
   const id = toString(payload.id);
   const timestamp = toNumber(payload.timestamp) ?? Date.now();
   const channelId = toString(payload.channel_id);
   const guildId = toString(payload.guild_id);
   const author = (payload.author ?? {}) as Record<string, unknown>;
   const senderId = toString(author.id);
-  if (!content || !id || !senderId || !channelId) return null;
+  if ((!text && attachments.length === 0) || !id || !senderId || !channelId) return null;
 
   return {
     type: "channel",
     senderId,
     senderName: toString(author.username),
-    content,
+    content: text,
+    attachments: attachments.length > 0 ? attachments : undefined,
     messageId: id,
     timestamp,
     channelId,
@@ -110,19 +266,20 @@ function parseChannelMessage(data: unknown): QQInboundMessage | null {
 
 function parseDirectMessage(data: unknown): QQInboundMessage | null {
   const payload = data as Record<string, unknown>;
-  const content = toString(payload.content);
+  const { text, attachments } = parseTextWithAttachments(payload);
   const id = toString(payload.id);
   const timestamp = toNumber(payload.timestamp) ?? Date.now();
   const guildId = toString(payload.guild_id);
   const author = (payload.author ?? {}) as Record<string, unknown>;
   const senderId = toString(author.id);
-  if (!content || !id || !senderId) return null;
+  if ((!text && attachments.length === 0) || !id || !senderId) return null;
 
   return {
     type: "direct",
     senderId,
     senderName: toString(author.username),
-    content,
+    content: text,
+    attachments: attachments.length > 0 ? attachments : undefined,
     messageId: id,
     timestamp,
     guildId,
@@ -237,6 +394,28 @@ function extractMediaLinesFromText(params: {
   return { text: result.text, mediaUrls };
 }
 
+function isOfficialQQFileSendLimit(errorMessage: string | undefined): boolean {
+  const text = (errorMessage ?? "").toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes("file_type=4") ||
+    text.includes("generic files") ||
+    text.includes("not support generic files") ||
+    text.includes("暂不支持通用文件")
+  );
+}
+
+function buildMediaFallbackText(mediaUrl: string, errorMessage?: string): string {
+  if (isOfficialQQFileSendLimit(errorMessage)) {
+    return [
+      "说明：根据 QQ 官方接口规范，当前 C2C/群聊暂不支持直接发送 PDF/文档等通用文件（file_type=4）。",
+      "这属于平台限制，不是插件缺陷；图片等媒体仍可正常发送。",
+      `已为你附上文件链接：${mediaUrl}`,
+    ].join("\n");
+  }
+  return `📎 ${mediaUrl}`;
+}
+
 function buildInboundContext(params: {
   event: QQInboundMessage;
   sessionKey: string;
@@ -320,7 +499,19 @@ async function dispatchToAgent(params: {
     storePath && sessionApi?.readSessionUpdatedAt
       ? sessionApi.readSessionUpdatedAt({ storePath, sessionKey: route.sessionKey })
       : null;
-  const rawBody = inbound.content;
+  const resolvedAttachments = await resolveInboundAttachmentsForAgent({
+    attachments: inbound.attachments,
+    qqCfg,
+    logger,
+  });
+  const localImageCount = resolvedAttachments.filter((item) => Boolean(item.localImagePath)).length;
+  if (localImageCount > 0) {
+    logger.info(`prepared ${localImageCount} local image attachment(s) for agent`);
+  }
+  const rawBody = buildInboundContentWithAttachments({
+    content: inbound.content,
+    attachments: resolvedAttachments,
+  });
   const envelopeFrom = resolveEnvelopeFrom(inbound);
   const inboundBody =
     replyApi.formatInboundEnvelope
@@ -497,10 +688,11 @@ async function dispatchToAgent(params: {
         cfg: { channels: { qqbot: qqCfg } },
         to: target.to,
         mediaUrl,
+        replyToId: inbound.messageId,
       });
       if (result.error) {
         logger.error(`sendMedia failed: ${result.error}`);
-        const fallback = `📎 ${mediaUrl}`;
+        const fallback = buildMediaFallbackText(mediaUrl, result.error);
         const fallbackResult = await qqbotOutbound.sendText({
           cfg: { channels: { qqbot: qqCfg } },
           to: target.to,
@@ -629,7 +821,11 @@ export async function handleQQBotDispatch(params: DispatchParams): Promise<void>
   }
 
   const content = inbound.content.trim();
-  if (!content) {
+  const attachmentCount = inbound.attachments?.length ?? 0;
+  if (attachmentCount > 0) {
+    logger.info(`inbound message includes ${attachmentCount} attachment(s)`);
+  }
+  if (!content && attachmentCount === 0) {
     return;
   }
 

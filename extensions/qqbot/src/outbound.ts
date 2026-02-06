@@ -105,14 +105,15 @@ export const qqbotOutbound = {
     to: string;
     text?: string;
     mediaUrl?: string;
+    replyToId?: string;
   }): Promise<QQBotSendResult> => {
-    const { cfg, to, mediaUrl, text } = params;
+    const { cfg, to, mediaUrl, text, replyToId } = params;
     if (!mediaUrl) {
       const fallbackText = text?.trim() ?? "";
       if (!fallbackText) {
         return { channel: "qqbot", error: "mediaUrl is required for sendMedia" };
       }
-      return qqbotOutbound.sendText({ cfg, to, text: fallbackText });
+      return qqbotOutbound.sendText({ cfg, to, text: fallbackText, replyToId });
     }
 
     const rawCfg = cfg.channels?.qqbot;
@@ -128,7 +129,7 @@ export const qqbotOutbound = {
     const target = parseTarget(to);
     if (target.kind === "channel") {
       const fallbackText = text?.trim() ? `${text}\n${mediaUrl}` : mediaUrl;
-      return qqbotOutbound.sendText({ cfg, to, text: fallbackText });
+      return qqbotOutbound.sendText({ cfg, to, text: fallbackText, replyToId });
     }
 
     try {
@@ -136,6 +137,7 @@ export const qqbotOutbound = {
         cfg: qqCfg,
         target: { kind: target.kind, id: target.id },
         mediaUrl,
+        messageId: replyToId,
       });
       return { channel: "qqbot", messageId: result.id, timestamp: result.timestamp };
     } catch (err) {

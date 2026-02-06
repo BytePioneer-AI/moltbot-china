@@ -19,7 +19,9 @@
       "groupAllowFrom": { "type": "array", "items": { "type": "string" } },
       "historyLimit": { "type": "integer", "minimum": 0 },
       "textChunkLimit": { "type": "integer", "minimum": 1 },
-      "replyFinalOnly": { "type": "boolean" }
+      "replyFinalOnly": { "type": "boolean" },
+      "maxFileSizeMB": { "type": "number", "exclusiveMinimum": 0 },
+      "mediaTimeoutMs": { "type": "integer", "minimum": 1 }
     }
   }
 }

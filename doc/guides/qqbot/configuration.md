@@ -4,7 +4,14 @@
 
 仓库地址：<https://github.com/BytePioneer-AI/openclaw-china>  
 
-**⭐ 如果这个项目对你有帮助，请给个 Star 支持一下~**
+<div align="center">
+
+  <p>
+    <strong>⭐ 如果这个项目对你有帮助，请给我们一个Star！⭐</strong><br>
+    <em>您的支持是我们持续改进的动力</em>
+  </p>
+
+</div>
 
 ## 一、获取 QQ 机器人凭证
 
@@ -122,9 +129,10 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 
 ## 四、能力与限制
 
-- 当前实现支持文本消息收发与文件发送（C2C/群聊）
-- 频道内暂不支持文件发送（会降级为文本 + URL）
-- 不支持语音/视频媒体发送
+- 当前实现支持文本消息收发与图片发送（C2C/群聊）
+- QQ C2C/群聊富媒体接口暂不支持通用文件（`file_type=4`，例如 PDF），这是官方接口限制而非插件缺陷，会降级为文本提示
+- 频道内暂不支持媒体发送（会降级为文本 + URL）
+- 语音/视频媒体能力依赖平台权限与格式限制，需按官方接口开通与验证
 - 不支持平台级流式输出
 - 定时提醒通过 OpenClaw cron 触发（无需额外配置）
 

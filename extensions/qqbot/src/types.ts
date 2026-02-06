@@ -17,11 +17,19 @@ export interface QQBotSendResult {
 
 export type QQChatType = "direct" | "group" | "channel";
 
+export interface QQInboundAttachment {
+  url: string;
+  filename?: string;
+  contentType?: string;
+  size?: number;
+}
+
 export interface QQInboundMessage {
   type: QQChatType;
   senderId: string;
   senderName?: string;
   content: string;
+  attachments?: QQInboundAttachment[];
   messageId: string;
   timestamp: number;
   groupOpenid?: string;
