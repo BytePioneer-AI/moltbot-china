@@ -31,6 +31,13 @@ type WecomAppWebhookTarget = {
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
 };
 
+type DecryptedWebhookTarget = {
+  target: WecomAppWebhookTarget;
+  plaintext: string;
+  msg: WecomAppInboundMessage;
+  agentId?: number;
+};
+
 type StreamState = {
   streamId: string;
   msgid?: string;
@@ -299,6 +306,62 @@ function parseWecomAppPlainMessage(raw: string): WecomAppInboundMessage {
   }
 }
 
+function resolveInboundAgentId(msg: WecomAppInboundMessage): number | undefined {
+  const raw =
+    (msg as { AgentID?: number | string }).AgentID ??
+    (msg as { AgentId?: number | string }).AgentId ??
+    (msg as { agentid?: number | string }).agentid ??
+    (msg as { agentId?: number | string }).agentId ??
+    (msg as { agent_id?: number | string }).agent_id;
+
+  if (raw === undefined || raw === null) return undefined;
+  const parsed = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function decryptWecomAppCandidates(params: {
+  candidates: WecomAppWebhookTarget[];
+  encrypt: string;
+}): DecryptedWebhookTarget[] {
+  const results: DecryptedWebhookTarget[] = [];
+
+  for (const candidate of params.candidates) {
+    if (!candidate.account.encodingAESKey) continue;
+    try {
+      const plaintext = decryptWecomAppEncrypted({
+        encodingAESKey: candidate.account.encodingAESKey,
+        receiveId: candidate.account.receiveId,
+        encrypt: params.encrypt,
+      });
+      const msg = parseWecomAppPlainMessage(plaintext);
+      const agentId = resolveInboundAgentId(msg);
+      results.push({ target: candidate, plaintext, msg, agentId });
+    } catch {
+      // ignore decryption errors for non-matching accounts
+    }
+  }
+
+  return results;
+}
+
+function selectDecryptedTarget(params: {
+  candidates: DecryptedWebhookTarget[];
+  logger: Logger;
+}): DecryptedWebhookTarget {
+  if (params.candidates.length === 1) return params.candidates[0]!;
+
+  const matchedByAgentId = params.candidates.filter((candidate) => {
+    const inboundAgentId = candidate.agentId;
+    return typeof inboundAgentId === "number" && candidate.target.account.agentId === inboundAgentId;
+  });
+
+  if (matchedByAgentId.length === 1) return matchedByAgentId[0]!;
+
+  const accountIds = params.candidates.map((candidate) => candidate.target.account.accountId).join(", ");
+  params.logger.warn(`multiple wecom-app accounts matched signature; using first match (accounts: ${accountIds})`);
+  return params.candidates[0]!;
+}
+
 async function waitForStreamContent(streamId: string, maxWaitMs: number): Promise<void> {
   if (maxWaitMs <= 0) return;
   const startedAt = Date.now();
@@ -372,8 +435,8 @@ export async function handleWecomAppWebhookRequest(req: IncomingMessage, res: Se
       return true;
     }
 
-    const target = targets.find((candidate) => {
-      if (!candidate.account.configured || !candidate.account.token) return false;
+    const signatureMatched = targets.filter((candidate) => {
+      if (!candidate.account.token) return false;
       return verifyWecomAppSignature({
         token: candidate.account.token,
         timestamp,
@@ -383,28 +446,34 @@ export async function handleWecomAppWebhookRequest(req: IncomingMessage, res: Se
       });
     });
 
-    if (!target || !target.account.encodingAESKey) {
+    if (signatureMatched.length === 0) {
       res.statusCode = 401;
       res.end("unauthorized");
       return true;
     }
 
-    try {
-      const plain = decryptWecomAppEncrypted({
-        encodingAESKey: target.account.encodingAESKey,
-        receiveId: target.account.receiveId,
-        encrypt: echostr,
-      });
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end(plain);
-      return true;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      res.statusCode = 400;
-      res.end(msg || "decrypt failed");
+    const decryptable = signatureMatched.filter((candidate) => Boolean(candidate.account.encodingAESKey));
+    if (decryptable.length === 0) {
+      res.statusCode = 401;
+      res.end("unauthorized");
       return true;
     }
+
+    const decryptedCandidates = decryptWecomAppCandidates({
+      candidates: decryptable,
+      encrypt: echostr,
+    });
+    if (decryptedCandidates.length === 0) {
+      res.statusCode = 400;
+      res.end("decrypt failed");
+      return true;
+    }
+
+    const selected = selectDecryptedTarget({ candidates: decryptedCandidates, logger });
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end(selected.plaintext);
+    return true;
   }
 
   if (req.method !== "POST") {
@@ -461,7 +530,7 @@ export async function handleWecomAppWebhookRequest(req: IncomingMessage, res: Se
     return true;
   }
 
-  const target = targets.find((candidate) => {
+  const signatureMatched = targets.filter((candidate) => {
     if (!candidate.account.token) return false;
     return verifyWecomAppSignature({
       token: candidate.account.token,
@@ -472,33 +541,39 @@ export async function handleWecomAppWebhookRequest(req: IncomingMessage, res: Se
     });
   });
 
-  if (!target) {
+  if (signatureMatched.length === 0) {
     res.statusCode = 401;
     res.end("unauthorized");
     return true;
   }
 
+  const decryptable = signatureMatched.filter((candidate) => Boolean(candidate.account.encodingAESKey));
+  if (decryptable.length === 0) {
+    res.statusCode = 500;
+    res.end("wecom-app not configured");
+    return true;
+  }
+
+  const decryptedCandidates = decryptWecomAppCandidates({
+    candidates: decryptable,
+    encrypt,
+  });
+  if (decryptedCandidates.length === 0) {
+    res.statusCode = 400;
+    res.end("decrypt failed");
+    return true;
+  }
+
+  const selected = selectDecryptedTarget({ candidates: decryptedCandidates, logger });
+  const target = selected.target;
   if (!target.account.configured || !target.account.token || !target.account.encodingAESKey) {
     res.statusCode = 500;
     res.end("wecom-app not configured");
     return true;
   }
 
-  let plain: string;
-  try {
-    plain = decryptWecomAppEncrypted({
-      encodingAESKey: target.account.encodingAESKey,
-      receiveId: target.account.receiveId,
-      encrypt,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.statusCode = 400;
-    res.end(msg || "decrypt failed");
-    return true;
-  }
-
-  const msg = parseWecomAppPlainMessage(plain);
+  const plain = selected.plaintext;
+  const msg = selected.msg;
   try {
     const mt = String((msg as any)?.msgtype ?? (msg as any)?.MsgType ?? "");
     const mid = String((msg as any)?.MediaId ?? (msg as any)?.media_id ?? (msg as any)?.image?.media_id ?? "");
