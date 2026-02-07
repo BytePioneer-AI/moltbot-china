@@ -14,7 +14,7 @@ const wecomPath = path.join(root, "extensions", "wecom", "package.json");
 const wecomAppPath = path.join(root, "extensions", "wecom-app", "package.json");
 const qqbotPath = path.join(root, "extensions", "qqbot", "package.json");
 const channelsPath = path.join(root, "packages", "channels", "package.json");
-const channelIds = ["dingtalk", "feishu", "wecom", "wecom-app", "qqbot"];
+const channelIds = ["dingtalk", "feishu-china", "wecom", "wecom-app", "qqbot"];
 
 function printUsage() {
   console.log(`
@@ -161,9 +161,12 @@ const originalChannels = readJson(channelsPath);
 
 try {
   const options = parseArgs(process.argv.slice(2));
+  if (options.channel === "feishu") {
+    options.channel = "feishu-china";
+  }
   const channelMap = {
     dingtalk: { pkg: dingtalkPkg, path: dingtalkPath },
-    feishu: { pkg: feishuPkg, path: feishuPath },
+    "feishu-china": { pkg: feishuPkg, path: feishuPath },
     wecom: { pkg: wecomPkg, path: wecomPath },
     "wecom-app": { pkg: wecomAppPkg, path: wecomAppPath },
     qqbot: { pkg: qqbotPkg, path: qqbotPath },
@@ -209,7 +212,7 @@ try {
     channelsPkg.version = nextChannels;
     channelsPkg.dependencies = channelsPkg.dependencies ?? {};
     channelsPkg.dependencies["@openclaw-china/dingtalk"] = nextDingtalk;
-    channelsPkg.dependencies["@openclaw-china/feishu"] = nextFeishu;
+    channelsPkg.dependencies["@openclaw-china/feishu-china"] = nextFeishu;
     channelsPkg.dependencies["@openclaw-china/wecom"] = nextWecom;
     channelsPkg.dependencies["@openclaw-china/wecom-app"] = nextWecomApp;
     channelsPkg.dependencies["@openclaw-china/qqbot"] = nextQqbot;
@@ -224,7 +227,7 @@ try {
 
     run("pnpm -F @openclaw-china/shared build");
     run("pnpm -F @openclaw-china/dingtalk build");
-    run("pnpm -F @openclaw-china/feishu build");
+    run("pnpm -F @openclaw-china/feishu-china build");
     run("pnpm -F @openclaw-china/wecom build");
     run("pnpm -F @openclaw-china/wecom-app build");
     run("pnpm -F @openclaw-china/qqbot build");
@@ -328,8 +331,8 @@ try {
   if (originalChannels.dependencies) {
     originalChannels.dependencies["@openclaw-china/dingtalk"] =
       originalChannels.dependencies["@openclaw-china/dingtalk"] ?? "workspace:*";
-    originalChannels.dependencies["@openclaw-china/feishu"] =
-      originalChannels.dependencies["@openclaw-china/feishu"] ?? "workspace:*";
+    originalChannels.dependencies["@openclaw-china/feishu-china"] =
+      originalChannels.dependencies["@openclaw-china/feishu-china"] ?? "workspace:*";
     originalChannels.dependencies["@openclaw-china/wecom"] =
       originalChannels.dependencies["@openclaw-china/wecom"] ?? "workspace:*";
     originalChannels.dependencies["@openclaw-china/wecom-app"] =

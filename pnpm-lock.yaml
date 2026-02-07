@@ -179,7 +179,7 @@ importers:
       '@openclaw-china/dingtalk':
         specifier: 0.1.14
         version: link:../../extensions/dingtalk
-      '@openclaw-china/feishu':
+      '@openclaw-china/feishu-china':
         specifier: 0.1.5
         version: link:../../extensions/feishu
       '@openclaw-china/qqbot':

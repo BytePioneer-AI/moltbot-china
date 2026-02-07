@@ -1,5 +1,5 @@
 /**
- * @openclaw-china/feishu
+ * @openclaw-china/feishu-china
  * 飞书渠道插件入口
  *
  * 导出:

@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw-china/feishu",
+  "name": "@openclaw-china/feishu-china",
   "version": "0.1.5",
   "type": "module",
   "description": "Moltbot Feishu/Lark channel plugin",
@@ -26,7 +26,7 @@
       "order": 70
     },
     "install": {
-      "npmSpec": "@openclaw-china/feishu",
+      "npmSpec": "@openclaw-china/feishu-china",
       "localPath": ".",
       "defaultChoice": "npm"
     }
@@ -47,7 +47,7 @@
       "order": 70
     },
     "install": {
-      "npmSpec": "@openclaw-china/feishu",
+      "npmSpec": "@openclaw-china/feishu-china",
       "localPath": ".",
       "defaultChoice": "npm"
     }
@@ -68,7 +68,7 @@
       "order": 70
     },
     "install": {
-      "npmSpec": "@openclaw-china/feishu",
+      "npmSpec": "@openclaw-china/feishu-china",
       "localPath": ".",
       "defaultChoice": "npm"
     }

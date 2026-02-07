@@ -22,8 +22,8 @@ import {
   sendMessageFeishu,
   setFeishuRuntime,
   getFeishuRuntime,
-} from "@openclaw-china/feishu";
-import feishuEntry from "@openclaw-china/feishu";
+} from "@openclaw-china/feishu-china";
+import feishuEntry from "@openclaw-china/feishu-china";
 import {
   wecomPlugin,
   DEFAULT_ACCOUNT_ID as WECOM_DEFAULT_ACCOUNT_ID,
@@ -96,7 +96,7 @@ export type {
   FeishuConfig,
   ResolvedFeishuAccount,
   FeishuSendResult,
-} from "@openclaw-china/feishu";
+} from "@openclaw-china/feishu-china";
 export type { WecomConfig, ResolvedWecomAccount, WecomInboundMessage } from "@openclaw-china/wecom";
 export type {
   WecomAppConfig,

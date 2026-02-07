@@ -12,10 +12,10 @@ Moltbot China 是一个开源扩展集，为 Moltbot Agent 系统添加中国区
 每个渠道作为独立插件发布到 npm，用户可按需安装：
 
 ```bash
-moltbot plugins install @openclaw-china/feishu
+moltbot plugins install @openclaw-china/feishu-china
 moltbot plugins install @openclaw-china/dingtalk
 # 或
-npm install @openclaw-china/feishu
+npm install @openclaw-china/feishu-china
 ```
 
 ---
@@ -68,7 +68,7 @@ moltbot-china/
 │
 └── extensions/
     │
-    ├── feishu/                            # @openclaw-china/feishu
+    ├── feishu/                            # @openclaw-china/feishu-china
     │   ├── moltbot.plugin.json
     │   ├── package.json
     │   ├── tsconfig.json
@@ -204,7 +204,7 @@ history.record(chatId, message);
 
 ```yaml
 channels:
-  feishu:
+  feishu-china:
     enabled: true
     appId: "cli_xxx"
     appSecret: "secret"
@@ -252,11 +252,11 @@ channels:
 
 ```json
 {
-  "id": "feishu",
+  "id": "feishu-china",
   "name": "Feishu",
   "description": "飞书/Lark 消息渠道插件",
   "version": "0.1.0",
-  "channels": ["feishu"],
+  "channels": ["feishu-china"],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -283,7 +283,7 @@ channels:
 
 ```json
 {
-  "name": "@openclaw-china/feishu",
+  "name": "@openclaw-china/feishu-china",
   "version": "0.1.0",
   "type": "module",
   "description": "Moltbot Feishu/Lark channel plugin",
@@ -292,16 +292,16 @@ channels:
   "moltbot": {
     "extensions": ["./index.ts"],
     "channel": {
-      "id": "feishu",
+      "id": "feishu-china",
       "label": "Feishu",
       "selectionLabel": "Feishu/Lark (飞书)",
-      "docsPath": "/channels/feishu",
+      "docsPath": "/channels/feishu-china",
       "blurb": "飞书/Lark 企业消息",
       "aliases": ["lark"],
       "order": 70
     },
     "install": {
-      "npmSpec": "@openclaw-china/feishu",
+      "npmSpec": "@openclaw-china/feishu-china",
       "localPath": ".",
       "defaultChoice": "npm"
     }
@@ -369,7 +369,7 @@ pnpm install
 pnpm -F @openclaw-china/shared build
 
 # 开发某个渠道
-pnpm -F @openclaw-china/feishu dev
+pnpm -F @openclaw-china/feishu-china dev
 ```
 
 ### 发布

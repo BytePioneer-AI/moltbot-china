@@ -100,7 +100,7 @@ openclaw plugins install @openclaw-china/dingtalk
 ```
 
 ```bash
-openclaw plugins install @openclaw-china/feishu
+openclaw plugins install @openclaw-china/feishu-china
 ```
 
 ```bash
