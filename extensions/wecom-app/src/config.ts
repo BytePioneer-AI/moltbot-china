@@ -26,6 +26,7 @@ const WecomAppAccountSchema = z.object({
   corpId: z.string().optional(),
   corpSecret: z.string().optional(),
   agentId: z.number().optional(),
+  apiBaseUrl: z.string().optional(),
 
   // 媒体文件大小限制 (MB)
   maxFileSizeMB: z.number().optional(),
@@ -77,6 +78,7 @@ export const WecomAppConfigJsonSchema = {
       corpId: { type: "string" },
       corpSecret: { type: "string" },
       agentId: { type: "number" },
+      apiBaseUrl: { type: "string" },
       inboundMedia: {
         type: "object",
         additionalProperties: false,
@@ -115,6 +117,7 @@ export const WecomAppConfigJsonSchema = {
             corpId: { type: "string" },
             corpSecret: { type: "string" },
             agentId: { type: "number" },
+            apiBaseUrl: { type: "string" },
             inboundMedia: {
               type: "object",
               additionalProperties: false,
@@ -221,6 +224,10 @@ export function resolveWecomAppAccount(params: { cfg: PluginConfig; accountId?: 
   }
 
   const agentId = merged.agentId ?? envAgentId;
+  const apiBaseUrl =
+    merged.apiBaseUrl?.trim() ||
+    (isDefaultAccount ? process.env.WECOM_APP_API_BASE_URL?.trim() : undefined) ||
+    undefined;
 
   const configured = Boolean(token && encodingAESKey);
   const canSendActive = Boolean(corpId && corpSecret && agentId);
@@ -237,7 +244,7 @@ export function resolveWecomAppAccount(params: { cfg: PluginConfig; accountId?: 
     corpSecret,
     agentId,
     canSendActive,
-    config: merged,
+    config: { ...merged, apiBaseUrl },
   };
 }
 
@@ -253,6 +260,14 @@ export function resolveDmPolicy(config: WecomAppAccountConfig): WecomAppDmPolicy
 
 export function resolveAllowFrom(config: WecomAppAccountConfig): string[] {
   return config.allowFrom ?? [];
+}
+
+export const DEFAULT_WECOM_APP_API_BASE_URL = "https://qyapi.weixin.qq.com";
+
+export function resolveApiBaseUrl(config: WecomAppAccountConfig): string {
+  const raw = (config.apiBaseUrl ?? "").trim();
+  if (!raw) return DEFAULT_WECOM_APP_API_BASE_URL;
+  return raw.replace(/\/+$/, "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

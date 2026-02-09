@@ -15,6 +15,7 @@
   <img src="../../images/qqbot-showcase-01.jpg" alt="QQ Bot 展示图 1" width="32%" />
   <img src="../../images/qqbot-showcase-02.jpg" alt="QQ Bot 展示图 2" width="32%" />
   <img src="../../images/qqbot-showcase-03.jpg" alt="QQ Bot 展示图 3" width="32%" />
+
 </p>
 
 ## 一、获取 QQ 机器人凭证
@@ -23,18 +24,18 @@
 
 访问 [QQ 开放平台](https://q.qq.com/#/register)，按提示完成注册并登录。
 
-<p align="center"><img src="../../images/qq-register.png" alt="QQ 注册入口" width="60%" /></p>
+<p align="center"><img src="../../images/qq-register.png" alt="QQ 注册入口" width="80%" /></p>
 
 注册完成后进入控制台，按页面指引继续。
 
-<p align="center"><img src="../../images/qq-console.png" alt="QQ 控制台" width="60%" /></p>
-<p align="center"><img src="../../images/qq-console-steps.png" alt="QQ 控制台步骤" width="60%" /></p>
+<p align="center"><img src="../../images/qq-console.png" alt="QQ 控制台" width="80%" /></p>
+<p align="center"><img src="../../images/qq-console-steps.png" alt="QQ 控制台步骤" width="80%" /></p>
 
 ### 2. 创建机器人应用
 
 进入 [应用管理](https://q.qq.com/#/apps)，选择“机器人”类型创建应用。
 
-<p align="center"><img src="../../images/qq-bot-entry.png" alt="机器人入口" width="60%" /></p>
+<p align="center"><img src="../../images/qq-bot-entry.png" alt="机器人入口" width="80%" /></p>
 
 创建完成后点击进入应用详情页。
 
@@ -42,15 +43,30 @@
 
 在应用详情页获取 `AppID` 与 `AppSecret`，用于配置 OpenClaw。
 
-<p align="center"><img src="../../images/qq-app-credentials.png" alt="AppID 与 AppSecret" width="60%" /></p>
+<p align="center"><img src="../../images/qq-app-credentials.png" alt="AppID 与 AppSecret" width="80%" /></p>
 
 ### 4. 开通权限与添加成员
 
-<p align="center"><img src="../../images/qq-permissions.png" alt="权限配置" width="60%" /></p>
+<p align="center"><img src="../../images/qq-permissions.png" alt="权限配置" width="80%" /></p>
 
 可选：将机器人加入测试群，便于在 QQ 群中调试。
 
-<p align="center"><img src="../../images/qq-add-to-group.png" alt="添加到群聊" width="60%" /></p>
+<p align="center"><img src="../../images/qq-add-to-group.png" alt="添加到群聊" width="80%" /></p>
+
+可选：QQ的MarkDown支持的很好，但需要申请，且有一定的申请时间。
+
+```bash
+# 申请成功后，可开通权限
+openclaw config set channels.qqbot.markdownSupport true
+```
+
+<p align="center"><img src="../../images/qq-markdown-template-enable.png" alt="QQ Markdown 模板开通入口" width="80%" /></p>
+
+供参考
+
+<p align="center"><img src="../../images/qq-markdown-template-application-form.png" alt="QQ Markdown 模板申请表" width="80%" /></p>
+
+
 
 ---
 

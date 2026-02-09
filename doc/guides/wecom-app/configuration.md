@@ -202,7 +202,8 @@ openclaw config set channels.wecom-app '{
   "encodingAESKey": "your-43-char-encoding-aes-key",
   "corpId": "your-corp-id",
   "corpSecret": "your-app-secret",
-  "agentId": 1000002
+  "agentId": 1000002,
+  "apiBaseUrl": "https://wecom-proxy.example.com"
 }' --json
 ```
 
@@ -216,6 +217,7 @@ openclaw config set channels.wecom-app.encodingAESKey your-43-char-encoding-aes-
 openclaw config set channels.wecom-app.corpId your-corp-id
 openclaw config set channels.wecom-app.corpSecret your-app-secret
 openclaw config set channels.wecom-app.agentId 1000002
+openclaw config set channels.wecom-app.apiBaseUrl https://wecom-proxy.example.com
 ```
 
 ### 或直接编辑配置文件
@@ -233,6 +235,7 @@ openclaw config set channels.wecom-app.agentId 1000002
       "corpId": "your-corp-id",
       "corpSecret": "your-app-secret",
       "agentId": 1000002,
+      "apiBaseUrl": "https://wecom-proxy.example.com",
       "inboundMedia": {
         "enabled": true,
         "maxBytes": 10485760,
@@ -254,11 +257,20 @@ openclaw config set channels.wecom-app.agentId 1000002
 | `corpId`                |  ✅  | 企业 ID                                                                 |
 | `corpSecret`            |  ✅  | 应用的 Secret                                                           |
 | `agentId`               |  ✅  | 应用的 AgentId                                                          |
+| `apiBaseUrl`            |  ❌  | 企业微信 API 基础地址；默认 `https://qyapi.weixin.qq.com`，可改为 VPS 代理地址 |
 | `welcomeText`           |  ❌  | 用户首次进入时的欢迎语                                                  |
 | `inboundMedia.enabled`  |  ❌  | 是否启用入站媒体落盘（默认启用）                                        |
 | `inboundMedia.dir`      |  ❌  | 入站媒体归档目录（跨平台默认：`~/.openclaw/media/wecom-app/inbound`） |
 | `inboundMedia.maxBytes` |  ❌  | 单个入站媒体最大字节数（默认 10MB）                                     |
 | `inboundMedia.keepDays` |  ❌  | 入站媒体保留天数（默认 7 天；用于自动清理）                             |
+
+### （可选）家庭局域网 + VPS 代理企微 API
+
+当 OpenClaw 跑在家庭网络，但企业微信后台可信 IP 配置在 VPS 时，可以把 `apiBaseUrl` 指向你的 VPS 代理地址（例如 `https://wecom-proxy.example.com`）。
+
+- 插件会在该地址后自动拼接 `/cgi-bin/...` 路径
+- 不配置时默认使用 `https://qyapi.weixin.qq.com`
+- 默认账号也可通过环境变量 `WECOM_APP_API_BASE_URL` 覆盖
 
 ---
 

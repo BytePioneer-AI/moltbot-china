@@ -7,6 +7,7 @@ import type { ResolvedWecomAppAccount, WecomAppSendTarget, AccessTokenCacheEntry
 import {
   resolveInboundMediaDir,
   resolveInboundMediaKeepDays,
+  resolveApiBaseUrl,
 } from "./config.js";
 import { mkdir, writeFile, unlink, rename, readdir, stat } from "node:fs/promises";
 import { basename, join, extname } from "node:path";
@@ -173,6 +174,11 @@ const accessTokenCache = new Map<string, AccessTokenCacheEntry>();
 /** Access Token 有效期: 2小时减去5分钟缓冲 */
 const ACCESS_TOKEN_TTL_MS = 7200 * 1000 - 5 * 60 * 1000;
 
+function buildWecomApiUrl(account: ResolvedWecomAppAccount, pathWithQuery: string): string {
+  const normalizedPath = pathWithQuery.startsWith("/") ? pathWithQuery : `/${pathWithQuery}`;
+  return `${resolveApiBaseUrl(account.config)}${normalizedPath}`;
+}
+
 /**
  * 移除 Markdown 格式，转换为纯文本
  * 方案 C: 代码块缩进，标题用【】标记，表格简化
@@ -282,7 +288,10 @@ export async function getAccessToken(account: ResolvedWecomAppAccount): Promise<
     return cached.token;
   }
 
-  const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${encodeURIComponent(account.corpId)}&corpsecret=${encodeURIComponent(account.corpSecret)}`;
+  const url = buildWecomApiUrl(
+    account,
+    `/cgi-bin/gettoken?corpid=${encodeURIComponent(account.corpId)}&corpsecret=${encodeURIComponent(account.corpSecret)}`
+  );
   const resp = await fetch(url);
   const data = (await resp.json()) as { errcode?: number; errmsg?: string; access_token?: string };
 
@@ -444,7 +453,10 @@ export async function downloadWecomMediaToFile(
       }
       const safeMediaId = raw;
       const token = await getAccessToken(account);
-      const url = `https://qyapi.weixin.qq.com/cgi-bin/media/get?access_token=${encodeURIComponent(token)}&media_id=${encodeURIComponent(safeMediaId)}`;
+      const url = buildWecomApiUrl(
+        account,
+        `/cgi-bin/media/get?access_token=${encodeURIComponent(token)}&media_id=${encodeURIComponent(safeMediaId)}`
+      );
 
       resp = await fetch(url, { signal: controller.signal });
       if (!resp.ok) {
@@ -568,7 +580,7 @@ export async function sendWecomAppMessage(
   // 这可能会在服务器日志、浏览器历史和引用头中暴露令牌。
   // 确保任何记录此 URL 的日志都隐藏 access_token 参数。
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`,
+    buildWecomApiUrl(account, `/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`),
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -615,7 +627,7 @@ export async function sendWecomAppMarkdownMessage(
   };
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`,
+    buildWecomApiUrl(account, `/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`),
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -729,7 +741,7 @@ export async function uploadImageMedia(
   const body = Buffer.concat([header, imageBuffer, footer]);
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=image`,
+    buildWecomApiUrl(account, `/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=image`),
     {
       method: "POST",
       body: body,
@@ -781,7 +793,7 @@ export async function sendWecomAppImageMessage(
   };
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`,
+    buildWecomApiUrl(account, `/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`),
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -906,7 +918,7 @@ export async function uploadVoiceMedia(
   const body = Buffer.concat([header, voiceBuffer, footer]);
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=voice`,
+    buildWecomApiUrl(account, `/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=voice`),
     {
       method: "POST",
       body: body,
@@ -958,7 +970,7 @@ export async function sendWecomAppVoiceMessage(
   };
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`,
+    buildWecomApiUrl(account, `/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`),
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -1107,7 +1119,7 @@ export async function uploadMedia(
   const body = Buffer.concat([header, buffer, footer]);
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=${type}`,
+    buildWecomApiUrl(account, `/cgi-bin/media/upload?access_token=${encodeURIComponent(token)}&type=${type}`),
     {
       method: "POST",
       body: body,
@@ -1160,7 +1172,7 @@ export async function sendWecomAppFileMessage(
   };
 
   const resp = await fetch(
-    `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`,
+    buildWecomApiUrl(account, `/cgi-bin/message/send?access_token=${encodeURIComponent(token)}`),
     {
       method: "POST",
       body: JSON.stringify(payload),

@@ -13,6 +13,7 @@
       "corpId": { "type": "string" },
       "corpSecret": { "type": "string" },
       "agentId": { "type": "number" },
+      "apiBaseUrl": { "type": "string" },
       "webhookPath": { "type": "string" },
       "token": { "type": "string" },
       "encodingAESKey": { "type": "string" },
@@ -35,6 +36,7 @@
             "corpId": { "type": "string" },
             "corpSecret": { "type": "string" },
             "agentId": { "type": "number" },
+            "apiBaseUrl": { "type": "string" },
             "webhookPath": { "type": "string" },
             "token": { "type": "string" },
             "encodingAESKey": { "type": "string" },
@@ -54,6 +56,7 @@
     "corpId": { "label": "企业ID (CorpID)" },
     "corpSecret": { "label": "应用Secret", "sensitive": true },
     "agentId": { "label": "应用AgentId" },
+    "apiBaseUrl": { "label": "企微 API 基础地址（可选代理）" },
     "token": { "label": "回调Token", "sensitive": true },
     "encodingAESKey": { "label": "回调EncodingAESKey", "sensitive": true },
     "webhookPath": { "label": "Webhook Path" }

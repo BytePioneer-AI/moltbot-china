@@ -28,6 +28,8 @@ export type WecomAppAccountConfig = {
   corpSecret?: string;
   /** 应用 AgentId (用于主动发送) */
   agentId?: number;
+  /** 企业微信 API 基础地址（可选，默认 https://qyapi.weixin.qq.com） */
+  apiBaseUrl?: string;
 
   /** 入站媒体（图片/文件）落盘设置 */
   inboundMedia?: {
