@@ -52,7 +52,7 @@
       <td align="center">✅ 可用</td>
       <td>-</td>
     </tr>
-  
+
   </tbody>
 </table>
 
@@ -69,8 +69,8 @@
 | 文本消息 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Markdown | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 流式响应 | ✅ | 🚧 | ❌ | 🚧 | ❌ |
-| 图片/文件 | ✅  | ✅ | ✅ | ✅  | ✅ 主动发送（支持网络 URL 和本地文件） |
-| 语音消息 | ✅  | 🚧 | ✅ | ✅ | ✅ |
+| 图片/文件 | ✅  | ✅（仅发送） | ✅（仅图片） | ✅  | ✅ 主动发送（支持网络 URL 和本地文件） |
+| 语音消息 | ✅ | 🚧 | ✅ | ✅ | ✅ |
 | 私聊 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 群聊 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | @机器人检测 | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -421,7 +421,7 @@ openclaw plugins install -l ./packages/channels
 **欢迎同学们一起开发~**
 
 
-<img src="https://github.com/user-attachments/assets/ec987754-041a-46f4-829e-215bcf6a10a8" alt="二维码" width="50%" />
+<img src="doc\images\wx_4.jpg" alt="二维码" width="50%" />
 
 
 
