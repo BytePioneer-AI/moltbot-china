@@ -57,6 +57,18 @@ export type WecomAppAccountConfig = {
     prefer?: "amr";
   };
 
+  /**
+   * 入站语音 ASR 配置（腾讯云录音文件识别极速版）
+   */
+  asr?: {
+    enabled?: boolean;
+    appId?: string;
+    secretId?: string;
+    secretKey?: string;
+    engineType?: string;
+    timeoutMs?: number;
+  };
+
   /** 欢迎文本 */
   welcomeText?: string;
 
@@ -72,6 +84,14 @@ export type WecomAppAccountConfig = {
 export type WecomAppConfig = WecomAppAccountConfig & {
   accounts?: Record<string, WecomAppAccountConfig>;
   defaultAccount?: string;
+};
+
+export type WecomAppASRCredentials = {
+  appId: string;
+  secretId: string;
+  secretKey: string;
+  engineType?: string;
+  timeoutMs?: number;
 };
 
 /**
@@ -157,6 +177,25 @@ export type WecomAppInboundImage = WecomAppInboundBase & {
   MediaId?: string;
 };
 
+export type WecomAppInboundLocation = WecomAppInboundBase & {
+  msgtype: "location";
+  MsgType?: "location";
+  /** 纬度 */
+  Location_X?: string;
+  /** 经度 */
+  Location_Y?: string;
+  /** 地图缩放级别 */
+  Scale?: string;
+  /** 地理位置文本 */
+  Label?: string;
+  location?: {
+    lat?: string;
+    lon?: string;
+    scale?: string;
+    label?: string;
+  };
+};
+
 export type WecomAppInboundEvent = WecomAppInboundBase & {
   msgtype: "event";
   MsgType?: "event";
@@ -178,6 +217,7 @@ export type WecomAppInboundMessage =
   | WecomAppInboundText
   | WecomAppInboundVoice
   | WecomAppInboundImage
+  | WecomAppInboundLocation
   | WecomAppInboundStreamRefresh
   | WecomAppInboundEvent
   | (WecomAppInboundBase & Record<string, unknown>);

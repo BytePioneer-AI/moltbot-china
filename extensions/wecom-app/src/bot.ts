@@ -8,13 +8,16 @@
 import {
   checkDmPolicy,
   createLogger,
+  transcribeTencentFlash,
   type Logger,
 } from "@openclaw-china/shared";
+import { readFile } from "node:fs/promises";
 
 import type { PluginRuntime } from "./runtime.js";
 import type { ResolvedWecomAppAccount, WecomAppInboundMessage, WecomAppDmPolicy } from "./types.js";
 import {
   resolveAllowFrom,
+  resolveWecomAppASRCredentials,
   resolveDmPolicy,
   resolveInboundMediaEnabled,
   resolveInboundMediaMaxBytes,
@@ -33,6 +36,15 @@ export type WecomAppDispatchHooks = {
   onChunk: (text: string) => void;
   onError?: (err: unknown) => void;
 };
+
+function resolveVoiceFormat(msg: WecomAppInboundMessage, savedPath: string): string {
+  const declared = String((msg as { Format?: string }).Format ?? "").trim().toLowerCase();
+  if (declared === "amr" || declared === "speex") return declared;
+  const lowerPath = savedPath.toLowerCase();
+  if (lowerPath.endsWith(".speex")) return "speex";
+  if (lowerPath.endsWith(".amr")) return "amr";
+  return "silk";
+}
 
 /**
  * 提取消息内容
@@ -72,6 +84,22 @@ export function extractWecomAppContent(msg: WecomAppInboundMessage): string {
   if (msgtype === "file") {
     const url = String((msg as { file?: { url?: string } }).file?.url ?? "").trim();
     return url ? `[file] ${url}` : "[file]";
+  }
+  if (msgtype === "location") {
+    const m = msg as {
+      Location_X?: string; LocationY?: string; Location_Y?: string; LocationX?: string;
+      Latitude?: string; Longitude?: string; Scale?: string; Label?: string; Address?: string; PoiName?: string;
+      location?: { lat?: string; lon?: string; lng?: string; latitude?: string; longitude?: string; x?: string; y?: string; scale?: string; label?: string; address?: string; name?: string };
+    };
+    const lat = String(m.Location_X ?? m.LocationX ?? m.Latitude ?? m.location?.lat ?? m.location?.latitude ?? m.location?.x ?? "").trim();
+    const lon = String(m.Location_Y ?? m.LocationY ?? m.Longitude ?? m.location?.lon ?? m.location?.lng ?? m.location?.longitude ?? m.location?.y ?? "").trim();
+    const scale = String(m.Scale ?? m.location?.scale ?? "").trim();
+    const label = String(m.Label ?? m.Address ?? m.PoiName ?? m.location?.label ?? m.location?.address ?? m.location?.name ?? "").trim();
+    const parts: string[] = [];
+    if (lat && lon) parts.push(`${lat},${lon}`);
+    if (label) parts.push(label);
+    if (scale) parts.push(`scale=${scale}`);
+    return parts.length ? `[location] ${parts.join(" ")}` : "[location]";
   }
   if (msgtype === "event") {
     const eventtype = String(
@@ -186,12 +214,49 @@ export async function enrichInboundContentWithMedia(params: {
     try {
       const mediaId = String((msg as { MediaId?: string }).MediaId ?? "").trim();
       const recognition = String((msg as { Recognition?: string }).Recognition ?? "").trim();
+      const asrCredentials = resolveWecomAppASRCredentials(accountConfig);
 
       if (mediaId) {
         const saved = await downloadWecomMediaToFile(account, mediaId, { maxBytes, prefix: "voice" });
         if (saved.ok && saved.path) {
           const finalPath = await finalizeInboundMedia(account, saved.path);
           mediaPaths.push(finalPath);
+
+          if (asrCredentials) {
+            try {
+              const audio = await readFile(finalPath);
+              const asrConfig: {
+                appId: string;
+                secretId: string;
+                secretKey: string;
+                engineType?: string;
+                voiceFormat: string;
+                timeoutMs?: number;
+              } = {
+                appId: asrCredentials.appId,
+                secretId: asrCredentials.secretId,
+                secretKey: asrCredentials.secretKey,
+                voiceFormat: resolveVoiceFormat(msg, finalPath),
+              };
+              if (asrCredentials.engineType) {
+                asrConfig.engineType = asrCredentials.engineType;
+              }
+              if (typeof asrCredentials.timeoutMs === "number") {
+                asrConfig.timeoutMs = asrCredentials.timeoutMs;
+              }
+              const transcript = await transcribeTencentFlash({
+                audio,
+                config: asrConfig,
+              });
+              const safeTranscript = transcript.trim();
+              if (safeTranscript) {
+                return makeResult(`[voice] saved:${finalPath}\n[recognition] ${safeTranscript}`);
+              }
+            } catch (err) {
+              // ASR 失败时保持兼容回退：优先使用企业微信自带 Recognition，再回退文件路径。
+            }
+          }
+
           // 如果有识别文本，包含它以便 Agent 看到转录内容
           if (recognition) {
             return makeResult(`[voice] saved:${finalPath}\n[recognition] ${recognition}`);

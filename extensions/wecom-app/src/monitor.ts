@@ -191,6 +191,16 @@ function isXmlFormat(raw: string): boolean {
   return trimmed.startsWith("<") && trimmed.endsWith(">");
 }
 
+function sanitizeWecomPayloadForLog(raw: string): string {
+  let out = String(raw ?? "");
+  // 脱敏常见密文字段
+  out = out.replace(/<Encrypt><!\[CDATA\[[\s\S]*?\]\]><\/Encrypt>/gi, "<Encrypt><![CDATA[[REDACTED]]]></Encrypt>");
+  out = out.replace(/\"encrypt\"\s*:\s*\"[^\"]*\"/gi, '"encrypt":"[REDACTED]"');
+  // 压缩日志体积
+  if (out.length > 1200) out = `${out.slice(0, 1200)}...[truncated]`;
+  return out;
+}
+
 function buildEncryptedJsonReply(params: {
   account: ResolvedWecomAppAccount;
   plaintextJson: unknown;
@@ -289,6 +299,20 @@ function parseWecomAppPlainMessage(raw: string): WecomAppInboundMessage {
       // voice fields
       Recognition: xmlData.Recognition,
       Format: xmlData.Format,
+      // location fields (兼容不同字段命名)
+      Location_X: xmlData.Location_X ?? xmlData.LocationX ?? xmlData.Latitude,
+      Location_Y: xmlData.Location_Y ?? xmlData.LocationY ?? xmlData.Longitude,
+      Scale: xmlData.Scale,
+      Label: xmlData.Label ?? xmlData.PoiName ?? xmlData.Address,
+      location:
+        xmlData.Location_X || xmlData.Location_Y || xmlData.LocationX || xmlData.LocationY || xmlData.Latitude || xmlData.Longitude || xmlData.Scale || xmlData.Label || xmlData.PoiName || xmlData.Address
+          ? {
+              lat: xmlData.Location_X ?? xmlData.LocationX ?? xmlData.Latitude,
+              lon: xmlData.Location_Y ?? xmlData.LocationY ?? xmlData.Longitude,
+              scale: xmlData.Scale,
+              label: xmlData.Label ?? xmlData.PoiName ?? xmlData.Address,
+            }
+          : undefined,
       // 事件类型
       Event: xmlData.Event,
     } as WecomAppInboundMessage;
@@ -575,10 +599,54 @@ export async function handleWecomAppWebhookRequest(req: IncomingMessage, res: Se
   const plain = selected.plaintext;
   const msg = selected.msg;
   try {
-    const mt = String((msg as any)?.msgtype ?? (msg as any)?.MsgType ?? "");
+    const mt = String((msg as any)?.msgtype ?? (msg as any)?.MsgType ?? "").trim();
     const mid = String((msg as any)?.MediaId ?? (msg as any)?.media_id ?? (msg as any)?.image?.media_id ?? "");
     const pic = String((msg as any)?.PicUrl ?? (msg as any)?.image?.url ?? "");
     logger.info(`[wecom-app] inbound msg parsed: msgtype=${mt} MediaId=${mid ? "yes" : "no"} PicUrl=${pic ? "yes" : "no"}`);
+    logger.info(`[wecom-app] MARKER_20260213 active monitor path`);
+    {
+      const m = (msg ?? {}) as Record<string, unknown>;
+      const keys = Object.keys(m);
+      const snapshot: Record<string, unknown> = {};
+      for (const k of keys) {
+        const v = m[k];
+        if (v === null || ["string", "number", "boolean"].includes(typeof v)) snapshot[k] = v;
+      }
+      logger.info(`[wecom-app] debug msg keys=${keys.join(",")}`);
+      logger.info(`[wecom-app] debug msg snapshot=${JSON.stringify(snapshot)}`);
+      logger.info(`[wecom-app] debug decrypted plaintext=${sanitizeWecomPayloadForLog(plain)}`);
+      logger.info(`[wecom-app] debug webhook raw body=${sanitizeWecomPayloadForLog(rawBody)}`);
+    }
+    if (mt.toLowerCase() === "location") {
+      const m = (msg ?? {}) as Record<string, unknown>;
+      const keys = Object.keys(m);
+      const get = (k: string) => {
+        const v = m[k];
+        return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : "";
+      };
+      logger.info(
+        `[wecom-app] location fields: ` +
+        `Location_X=${get("Location_X")} ` +
+        `Location_Y=${get("Location_Y")} ` +
+        `LocationX=${get("LocationX")} ` +
+        `LocationY=${get("LocationY")} ` +
+        `Latitude=${get("Latitude")} ` +
+        `Longitude=${get("Longitude")} ` +
+        `Label=${get("Label")} ` +
+        `Address=${get("Address")} ` +
+        `PoiName=${get("PoiName")} ` +
+        `Scale=${get("Scale")}`
+      );
+      logger.info(`[wecom-app] location raw msg keys=${keys.join(",")}`);
+      const snapshot: Record<string, unknown> = {};
+      for (const k of keys) {
+        const v = m[k];
+        if (v === null || ["string", "number", "boolean"].includes(typeof v)) snapshot[k] = v;
+      }
+      logger.info(`[wecom-app] location raw msg snapshot=${JSON.stringify(snapshot)}`);
+      logger.info(`[wecom-app] location decrypted plaintext=${sanitizeWecomPayloadForLog(plain)}`);
+      logger.info(`[wecom-app] location webhook raw body=${sanitizeWecomPayloadForLog(rawBody)}`);
+    }
   } catch {
     // ignore
   }
