@@ -12,17 +12,16 @@
   <a href="#开发">开发</a> •
   <a href="#加入交流群">加入交流群</a>
 </p>
-
 <p align="center">
   <strong>⭐ 如果这个项目对你有帮助，请给我们一个Star！⭐</strong><br>
   <em>您的支持是我们持续改进的动力</em>
 </p>
-
 <table align="center">
   <thead>
     <tr>
       <th>平台</th>
       <th>状态</th>
+      <th>配置复杂度</th>
       <th>配置指南</th>
     </tr>
   </thead>
@@ -30,28 +29,34 @@
     <tr>
       <td>钉钉</td>
       <td align="center">✅ 可用</td>
+      <td align="center">简单</td>
       <td><a href="doc/guides/dingtalk/configuration.md">钉钉企业注册指南</a></td>
+    </tr>
+       <tr>
+      <td>QQ 机器人</td>
+      <td align="center">✅ 可用</td>
+      <td align="center">简单</td>
+      <td><a href="doc/guides/qqbot/configuration.md">QQ 渠道配置指南</a></td>
+    </tr>
+     <tr>
+      <td>企业微信（智能机器人）</td>
+      <td align="center">✅ 可用</td>
+      <td align="center">中等</td>
+      <td><a href="doc/guides/wecom/configuration.md">企业微信智能机器人配置指南</a></td>
     </tr>
     <tr>
       <td>企业微信（自建应用-可接入微信）</td>
       <td align="center">✅ 可用</td>
+      <td align="center">中等+</td>
       <td><a href="doc/guides/wecom-app/configuration.md">企业微信自建应用配置指南</a></td>
-    </tr>
-    <tr>
-      <td>QQ 机器人</td>
-      <td align="center">✅ 可用</td>
-      <td><a href="doc/guides/qqbot/configuration.md">QQ 渠道配置指南</a></td>
-    </tr>
-      <tr>
-      <td>企业微信（智能机器人）</td>
-      <td align="center">✅ 可用</td>
-      <td><a href="doc/guides/wecom/configuration.md">企业微信智能机器人配置指南</a></td>
     </tr>
     <tr>
       <td>飞书</td>
       <td align="center">✅ 可用</td>
+      <td align="center">中等+</td>
       <td>-</td>
     </tr>
+
 
   </tbody>
 </table>
@@ -68,14 +73,14 @@
 |------|:----:|:----:|:--:|:------------------:|:----------------:|
 | 文本消息 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Markdown | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 流式响应 | ✅ | 🚧 | ❌ | 🚧 | ❌ |
-| 图片/文件 | ✅  | ✅（仅发送） | ✅（仅图片） | ✅  | ✅ 主动发送（支持网络 URL 和本地文件） |
-| 语音消息 | ✅ | 🚧 | ✅ | ✅ | ✅ |
+| 流式响应 | ✅ | - | ❌ | 🚧 | ❌ |
+| 图片/文件 | ✅  | ✅<br />（仅发送） | ✅<br />（仅图片） | ✅  | ✅<br />（出站任意类型；入站允许图片、音视频、定位、语音） |
+| 语音消息 | ✅ | - | ✅ | ✅ | ✅ |
 | 私聊 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 群聊 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | @机器人检测 | ✅ | ✅ | ✅ | ❌ | ❌ |
 | 多账户 | 🚧 | 🚧 | 🚧 | ✅ | ✅ |
-| 主动发送消息 | ✅ | ✅ | ✅ | ❌ | ✅（文本、图片、Markdown） |
+| 主动发送消息<br />（定时任务） | ✅ | ✅ | ✅ | ❌ | ✅（文本、图片、Markdown） |
 | 连接方式 | Stream | WebSocket | - | HTTPS 回调 | HTTPS 回调 |
 | Access Token 缓存 | - | - | - | - | ✅（2 小时有效期） |
 
