@@ -34,11 +34,6 @@ type StreamState = {
   content: string;
 };
 
-type StreamBinding = {
-  accountId: string;
-  to: string;
-};
-
 type StreamRouteBinding = {
   sessionKey?: string;
   runId?: string;
@@ -47,9 +42,6 @@ type StreamRouteBinding = {
 const webhookTargets = new Map<string, WecomWebhookTarget[]>();
 const streams = new Map<string, StreamState>();
 const msgidToStreamId = new Map<string, string>();
-const streamBindings = new Map<string, StreamBinding>();
-const activeStreamByTarget = new Map<string, string>();
-const activeStreamIdsByTo = new Map<string, Set<string>>();
 const streamRouteBindings = new Map<string, StreamRouteBinding>();
 const streamBySessionKey = new Map<string, string>();
 const streamByRunId = new Map<string, string>();
@@ -66,27 +58,6 @@ function normalizeWebhookPath(raw: string): string {
   const withSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   if (withSlash.length > 1 && withSlash.endsWith("/")) return withSlash.slice(0, -1);
   return withSlash;
-}
-
-function normalizeToToken(raw: string): string {
-  const value = raw.trim();
-  if (!value) return "";
-  if (value.startsWith("user:")) {
-    return `user:${value.slice("user:".length).trim().toLowerCase()}`;
-  }
-  if (value.startsWith("group:")) {
-    return `group:${value.slice("group:".length).trim()}`;
-  }
-  return value;
-}
-
-function normalizeAccountTargetKey(accountId: string, to: string): string {
-  return `${accountId.trim()}::${normalizeToToken(to)}`;
-}
-
-function isStreamActive(streamId: string): boolean {
-  const state = streams.get(streamId);
-  return Boolean(state && !state.finished);
 }
 
 function appendToStream(streamId: string, chunk: string): boolean {
@@ -287,17 +258,6 @@ function appendStreamContent(state: StreamState, nextText: string): void {
   }
 }
 
-function bindActiveStream(params: { streamId: string; accountId: string; to: string }): void {
-  const accountId = params.accountId.trim();
-  const to = normalizeToToken(params.to);
-  if (!accountId || !to) return;
-  streamBindings.set(params.streamId, { accountId, to });
-  activeStreamByTarget.set(normalizeAccountTargetKey(accountId, to), params.streamId);
-  const ids = activeStreamIdsByTo.get(to) ?? new Set<string>();
-  ids.add(params.streamId);
-  activeStreamIdsByTo.set(to, ids);
-}
-
 function bindStreamRouteContext(params: { streamId: string; sessionKey?: string; runId?: string }): void {
   const streamId = params.streamId.trim();
   if (!streamId) return;
@@ -323,23 +283,6 @@ function unbindActiveStream(streamId: string): void {
     clearTimeout(timer);
     streamFinalizeTimers.delete(streamId);
   }
-  const binding = streamBindings.get(streamId);
-  if (binding) {
-    const key = normalizeAccountTargetKey(binding.accountId, binding.to);
-    if (activeStreamByTarget.get(key) === streamId) {
-      activeStreamByTarget.delete(key);
-    }
-    const ids = activeStreamIdsByTo.get(binding.to);
-    if (ids) {
-      ids.delete(streamId);
-      if (ids.size > 0) {
-        activeStreamIdsByTo.set(binding.to, ids);
-      } else {
-        activeStreamIdsByTo.delete(binding.to);
-      }
-    }
-  }
-  streamBindings.delete(streamId);
   const routeBinding = streamRouteBindings.get(streamId);
   if (routeBinding?.sessionKey && streamBySessionKey.get(routeBinding.sessionKey) === streamId) {
     streamBySessionKey.delete(routeBinding.sessionKey);
@@ -357,44 +300,37 @@ export function appendWecomActiveStreamChunk(params: {
   sessionKey?: string;
   runId?: string;
 }): boolean {
-  const accountId = params.accountId.trim();
-  const to = normalizeToToken(params.to);
   const chunk = params.chunk.trim();
-  if (!accountId || !to || !chunk) return false;
+  if (!chunk) return false;
 
   const runId = params.runId?.trim();
+  const sessionKey = params.sessionKey?.trim();
   if (runId) {
     const streamId = streamByRunId.get(runId);
     if (streamId && appendToStream(streamId, chunk)) return true;
 
-    // When runId is present but not bound, avoid ambiguous fallbacks that can
-    // append chunks into another in-flight stream for the same session/user.
-    const candidates = Array.from(activeStreamIdsByTo.get(to) ?? []).filter((id) => isStreamActive(id));
-    if (candidates.length === 1) {
-      console.warn(`[wecom] append stream chunk fallback by unique to after runId miss: runId=${runId}, to=${to}`);
-      return appendToStream(candidates[0]!, chunk);
-    }
-    if (candidates.length > 1) {
-      console.warn(
-        `[wecom] append stream chunk dropped: runId=${runId} not bound and ${candidates.length} active streams share to=${to}`
-      );
+    // Strict mode: if runId has not been bound yet, only allow deterministic
+    // backfill from the same sessionKey, then persist the runId binding.
+    if (sessionKey) {
+      const sessionStreamId = streamBySessionKey.get(sessionKey);
+      if (sessionStreamId && appendToStream(sessionStreamId, chunk)) {
+        bindStreamRouteContext({
+          streamId: sessionStreamId,
+          sessionKey,
+          runId,
+        });
+        console.warn(
+          `[wecom] append stream chunk recovered run binding by sessionKey: runId=${runId}, sessionKey=${sessionKey}`
+        );
+        return true;
+      }
     }
     return false;
   }
 
-  const sessionKey = params.sessionKey?.trim();
   if (sessionKey) {
     const streamId = streamBySessionKey.get(sessionKey);
     if (streamId && appendToStream(streamId, chunk)) return true;
-  }
-
-  const streamId = activeStreamByTarget.get(normalizeAccountTargetKey(accountId, to));
-  if (streamId && appendToStream(streamId, chunk)) return true;
-
-  const candidates = Array.from(activeStreamIdsByTo.get(to) ?? []).filter((id) => isStreamActive(id));
-  if (candidates.length === 1) {
-    console.warn(`[wecom] append stream chunk fallback by to-only key: to=${to}`);
-    return appendToStream(candidates[0]!, chunk);
   }
 
   return false;
@@ -650,9 +586,6 @@ export async function handleWecomWebhookRequest(req: IncomingMessage, res: Serve
 
   const streamId = createStreamId();
   if (msgid) msgidToStreamId.set(msgid, streamId);
-  const senderId = String(msg.from?.userid ?? "").trim() || "unknown";
-  const chatType = String(msg.chattype ?? "").toLowerCase() === "group" ? "group" : "single";
-  const to = chatType === "group" ? `group:${String(msg.chatid ?? "").trim() || "unknown"}` : `user:${senderId}`;
   streams.set(streamId, {
     streamId,
     msgid,
@@ -661,11 +594,6 @@ export async function handleWecomWebhookRequest(req: IncomingMessage, res: Serve
     started: false,
     finished: false,
     content: "",
-  });
-  bindActiveStream({
-    streamId,
-    accountId: target.account.accountId,
-    to,
   });
 
   const core = tryGetWecomRuntime();
