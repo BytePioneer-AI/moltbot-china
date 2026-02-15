@@ -119,7 +119,6 @@ openclaw config set channels.dingtalk '{
 | clientSecret | string | - | 钉钉应用 AppSecret |
 | dmPolicy | string | "open" | 单聊策略: open/pairing/allowlist |
 | groupPolicy | string | "open" | 群聊策略: open/allowlist/disabled |
-| requireMention | boolean | true | 群聊是否需要 @机器人 |
 | enableAICard | boolean | true | 是否启用 AI Card 流式响应 |
 | maxFileSizeMB | number | 100 | 媒体文件大小限制 (MB) |
 | inboundMedia.dir | string | `~/.openclaw/media/dingtalk/inbound` | 入站媒体归档根目录 |

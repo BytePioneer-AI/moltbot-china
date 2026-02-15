@@ -195,7 +195,6 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
     "dingtalk": {
       "dmPolicy": "open",          // open | pairing | allowlist
       "groupPolicy": "open",       // open | allowlist | disabled
-      "requireMention": true,
       "allowFrom": [],
       "groupAllowFrom": []
     },
@@ -371,7 +370,6 @@ openclaw gateway --port 18789 --verbose
 | `enabled` | 是否启用 |
 | `dmPolicy` | 私聊策略：`open`（任何人）/ `allowlist`（白名单） |
 | `groupPolicy` | 群聊策略：`open`（任何群）/ `allowlist`（白名单）/ `disabled`（禁用） |
-| `requireMention` | 群聊中是否需要 @机器人 |
 | `allowFrom` | 私聊白名单用户 ID |
 | `groupAllowFrom` | 群聊白名单群 ID |
 | `maxFileSizeMB` | 媒体文件大小限制 (MB)，默认 100 |
