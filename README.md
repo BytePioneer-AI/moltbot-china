@@ -1,3 +1,8 @@
+<p align="center">
+  <strong style="font-size: 32px;">🧧🏮🎆 春 节 快 乐 🎆🏮🧧</strong><br>
+  <strong>恭喜发财 · 万事如意 · 马年大吉</strong>
+</p>
+
 # 🦞 OpenClaw China — China IM Channels
 
 <p align="center">
