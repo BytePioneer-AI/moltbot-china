@@ -531,6 +531,7 @@ async function configureWecomApp(prompter: SetupPrompter, cfg: ConfigRoot): Prom
   section("配置 WeCom App（自建应用-可接入微信）");
   showGuideLink("wecom-app");
   const existing = getChannelConfig(cfg, "wecom-app");
+  const existingAsr = isRecord(existing.asr) ? existing.asr : {};
 
   const webhookPath = await prompter.askText({
     label: "Webhook 路径（需与企业微信后台配置一致，默认 /wecom-app）",
@@ -572,6 +573,38 @@ async function configureWecomApp(prompter: SetupPrompter, cfg: ConfigRoot): Prom
   patch.corpId = corpId;
   patch.corpSecret = corpSecret;
   patch.agentId = agentId;
+  const asrEnabled = await prompter.askConfirm(
+    "启用 ASR（支持入站语音自动转文字）",
+    toBoolean(existingAsr.enabled, false)
+  );
+  const asr: ConfigRecord = {
+    enabled: asrEnabled,
+  };
+  if (asrEnabled) {
+    clackNote(
+      [
+        "ASR 开通方式请查看配置文档：步骤七（可选）：开启语音转文本（ASR）",
+        "https://github.com/BytePioneer-AI/openclaw-china/blob/main/doc/guides/wecom-app/configuration.md",
+      ].join("\n"),
+      "提示"
+    );
+    asr.appId = await prompter.askText({
+      label: "ASR appId（腾讯云）",
+      defaultValue: toTrimmedString(existingAsr.appId),
+      required: true,
+    });
+    asr.secretId = await prompter.askSecret({
+      label: "ASR secretId（腾讯云）",
+      existingValue: toTrimmedString(existingAsr.secretId),
+      required: true,
+    });
+    asr.secretKey = await prompter.askSecret({
+      label: "ASR secretKey（腾讯云）",
+      existingValue: toTrimmedString(existingAsr.secretKey),
+      required: true,
+    });
+  }
+  patch.asr = asr;
 
   return mergeChannelConfig(cfg, "wecom-app", patch);
 }
@@ -580,6 +613,7 @@ async function configureQQBot(prompter: SetupPrompter, cfg: ConfigRoot): Promise
   section("配置 QQBot（QQ 机器人）");
   showGuideLink("qqbot");
   const existing = getChannelConfig(cfg, "qqbot");
+  const existingAsr = isRecord(existing.asr) ? existing.asr : {};
 
   const appId = await prompter.askText({
     label: "QQBot appId",
@@ -591,20 +625,46 @@ async function configureQQBot(prompter: SetupPrompter, cfg: ConfigRoot): Promise
     existingValue: toTrimmedString(existing.clientSecret),
     required: true,
   });
+  clackNote(
+    "QQ 的 Markdown 体验很好，但需要先申请开通，详情请查看配置文档。",
+    "提示"
+  );
   const markdownSupport = await prompter.askConfirm(
     "启用 Markdown 支持",
     toBoolean(existing.markdownSupport, false)
   );
-  const replyFinalOnly = await prompter.askConfirm(
-    "仅发送最终回复（关闭流式分片）",
-    toBoolean(existing.replyFinalOnly, false)
+  const asrEnabled = await prompter.askConfirm(
+    "启用 ASR（支持入站语音自动转文字）",
+    toBoolean(existingAsr.enabled, false)
   );
+
+  const asr: ConfigRecord = {
+    enabled: asrEnabled,
+  };
+  if (asrEnabled) {
+    clackNote("ASR 开通方式详情请查看配置文档。", "提示");
+    asr.appId = await prompter.askText({
+      label: "ASR appId（腾讯云）",
+      defaultValue: toTrimmedString(existingAsr.appId),
+      required: true,
+    });
+    asr.secretId = await prompter.askSecret({
+      label: "ASR secretId（腾讯云）",
+      existingValue: toTrimmedString(existingAsr.secretId),
+      required: true,
+    });
+    asr.secretKey = await prompter.askSecret({
+      label: "ASR secretKey（腾讯云）",
+      existingValue: toTrimmedString(existingAsr.secretKey),
+      required: true,
+    });
+  }
 
   return mergeChannelConfig(cfg, "qqbot", {
     appId,
     clientSecret,
     markdownSupport,
-    replyFinalOnly,
+    asr,
   });
 }
 
