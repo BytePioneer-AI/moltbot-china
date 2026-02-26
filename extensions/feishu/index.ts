@@ -10,6 +10,7 @@
 
 import { feishuPlugin, DEFAULT_ACCOUNT_ID } from "./src/channel.js";
 import { setFeishuRuntime } from "./src/runtime.js";
+import { registerChinaSetupCli } from "@openclaw-china/shared";
 
 /**
  * Moltbot 插件 API 接口
@@ -77,6 +78,8 @@ const plugin = {
    * 2. 调用 api.registerChannel 将 feishuPlugin 注册到 Moltbot
    */
   register(api: MoltbotPluginApi) {
+    registerChinaSetupCli(api, { channels: ["feishu-china"] });
+
     if (api.runtime) {
       setFeishuRuntime(api.runtime as Record<string, unknown>);
     }

@@ -5,6 +5,7 @@
 
 import { qqbotPlugin, DEFAULT_ACCOUNT_ID } from "./src/channel.js";
 import { setQQBotRuntime, getQQBotRuntime } from "./src/runtime.js";
+import { registerChinaSetupCli } from "@openclaw-china/shared";
 
 export interface MoltbotPluginApi {
   registerChannel: (opts: { plugin: unknown }) => void;
@@ -50,6 +51,8 @@ const plugin = {
   },
 
   register(api: MoltbotPluginApi) {
+    registerChinaSetupCli(api, { channels: ["qqbot"] });
+
     if (api.runtime) {
       setQQBotRuntime(api.runtime as Record<string, unknown>);
     }

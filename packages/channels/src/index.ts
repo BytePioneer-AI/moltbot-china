@@ -53,7 +53,7 @@ import {
   getQQBotRuntime,
 } from "@openclaw-china/qqbot";
 import qqbotEntry from "@openclaw-china/qqbot";
-import { registerChinaSetupCli } from "./cli/china-setup.js";
+import { registerChinaSetupCli } from "@openclaw-china/shared";
 
 export {
   dingtalkPlugin,
@@ -315,7 +315,7 @@ const channelsPlugin = {
    * 从 api.config.channels.<id>.enabled 读取配置
    */
   register(api: MoltbotPluginApi) {
-    registerChinaSetupCli(api);
+    registerChinaSetupCli(api, { channels: SUPPORTED_CHANNELS });
     showPromoHint(api);
     registerChannelsByConfig(api);
   },

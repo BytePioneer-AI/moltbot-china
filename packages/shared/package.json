@@ -5,6 +5,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@clack/prompts": "^1.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

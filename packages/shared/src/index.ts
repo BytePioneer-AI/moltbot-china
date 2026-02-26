@@ -9,3 +9,4 @@ export * from "./file/index.js";
 export * from "./media/index.js";
 export * from "./cron/index.js";
 export * from "./asr/index.js";
+export * from "./cli/index.js";

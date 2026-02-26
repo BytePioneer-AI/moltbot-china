@@ -12,6 +12,7 @@
 
 import { dingtalkPlugin, DEFAULT_ACCOUNT_ID } from "./src/channel.js";
 import { setDingtalkRuntime } from "./src/runtime.js";
+import { registerChinaSetupCli } from "@openclaw-china/shared";
 
 /**
  * Moltbot 插件 API 接口
@@ -81,6 +82,8 @@ const plugin = {
    * Requirements: 1.1
    */
   register(api: MoltbotPluginApi) {
+    registerChinaSetupCli(api, { channels: ["dingtalk"] });
+
     // 设置完整的运行时（包含 channel.routing、channel.reply 等 API）
     // 这是消息分发到 Agent 的关键
     if (api.runtime) {
