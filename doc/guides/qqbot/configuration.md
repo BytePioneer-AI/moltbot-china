@@ -82,7 +82,9 @@ npm install -g openclaw@latest
 
 ```bash
 openclaw plugins install @openclaw-china/channels
+openclaw china setup
 ```
+
 
 ### 3. 安装 OpenClaw China 全渠道插件（方式二：从源码安装，全平台通用）
 
@@ -94,6 +96,7 @@ cd openclaw-china
 pnpm install
 pnpm build
 openclaw plugins install -l ./packages/channels
+openclaw china setup
 ```
 
 更新源码（用于后续升级）：
@@ -109,6 +112,8 @@ pnpm build
 ## 三、配置与启动
 
 ### 1. 配置 QQ 渠道
+
+> 推荐使用「配置向导」：`openclaw china setup`
 
 ```bash
 openclaw config set channels.qqbot.enabled true

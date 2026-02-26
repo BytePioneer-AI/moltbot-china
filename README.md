@@ -121,9 +121,9 @@
 #### 方式一：从 npm 安装
 
 **安装统一包（包含所有渠道）**
-
 ```bash
 openclaw plugins install @openclaw-china/channels
+openclaw china setup
 ```
 
 **或者：安装单个渠道（不要和统一包同时安装）**
@@ -165,6 +165,7 @@ cd openclaw-china
 pnpm install
 pnpm build
 openclaw plugins install -l ./packages/channels
+openclaw china setup
 ```
 
 #### 更新源码
@@ -180,6 +181,8 @@ pnpm build
 > ℹ️ 如果你使用的是旧名称 **clawbot**，请使用 `@openclaw-china/channels@0.1.12`。
 
 ### 2) 配置渠道
+
+> 推荐：优先使用「配置向导」`openclaw china setup` 完成配置。下面的 `openclaw config set ...` 为手动配置示例。
 
 <details>
 <summary><strong>钉钉</strong></summary>
@@ -433,6 +436,7 @@ pnpm build
 
 # 以链接模式安装（修改代码后实时生效）
 openclaw plugins install -l ./packages/channels
+openclaw china setup
 ```
 
 **示例配置（开发环境）**

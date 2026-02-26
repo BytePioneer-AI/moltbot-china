@@ -89,6 +89,7 @@ npm install -g openclaw@latest
 
 ```bash
 openclaw plugins install @openclaw-china/channels
+openclaw china setup
 ```
 
 ---
@@ -96,6 +97,8 @@ openclaw plugins install @openclaw-china/channels
 ## 三、配置与启动
 
 ### 1. 配置钉钉渠道
+
+> 推荐使用「配置向导」：`openclaw china setup`
 
 ```bash
 openclaw config set channels.dingtalk '{

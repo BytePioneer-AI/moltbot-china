@@ -64,6 +64,7 @@ openclaw onboard --install-daemon
 
 ```bash
 openclaw plugins install @openclaw-china/channels
+openclaw china setup
 ```
 仅安装企业微信渠道
 
@@ -81,12 +82,15 @@ cd openclaw-china
 pnpm install
 pnpm build
 openclaw plugins install -l ./packages/channels
+openclaw china setup
 ```
 
 
 ## 三、配置
 
 最小可用配置：
+
+> 推荐使用「配置向导」：`openclaw china setup`
 
 ```bash
 openclaw config set channels.wecom.enabled true

@@ -54,6 +54,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@clack/prompts": "^1.0.0",
     "@openclaw-china/dingtalk": "0.1.14",
     "@openclaw-china/feishu-china": "0.1.5",
     "@openclaw-china/qqbot": "0.1.0",

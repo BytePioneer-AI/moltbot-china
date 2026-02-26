@@ -63,41 +63,63 @@
 
 ## 步骤零：安装 wecom-app 插件
 
-### 1. 克隆代码仓库
+支持两种安装方式，按需选择：
+
+### 方式一：从 npm 安装（推荐）
+
+> ⚠️ **Windows 用户注意**：若遇到 `spawn npm ENOENT` 错误，请改用方式二（源码安装）。
+
+**安装聚合包（包含所有渠道插件）**
+
+```bash
+openclaw plugins install @openclaw-china/channels
+openclaw china setup
+```
+
+**仅安装 wecom-app 插件**
+
+```bash
+openclaw plugins install @openclaw-china/wecom-app
+openclaw china setup
+```
+
+### 方式二：从源码安装（适合开发调试 / Windows 兼容）
+
+1. 克隆仓库
+
+> 原贡献者仓库：https://github.com/RainbowRain9/openclaw-china.git
+> BytePioneer-AI/openclaw-china 版本较新，建议用。
 
 ```bash
 cd ~/.openclaw/extensions
-git clone https://github.com/RainbowRain9/openclaw-china.git
+git clone https://github.com/BytePioneer-AI/openclaw-china.git
 ```
 
-### 2. 进入插件目录并安装依赖
+2. 安装依赖并构建
 
 ```bash
 cd ~/.openclaw/extensions/openclaw-china/extensions/wecom-app
 pnpm install
-```
-
-### 3. 构建插件
-
-```bash
 pnpm build
 ```
 
-### 4. 安装到 OpenClaw
+3. 以链接模式安装到 OpenClaw
 
 ```bash
 openclaw plugins install -l ~/.openclaw/extensions/openclaw-china/extensions/wecom-app
+openclaw china setup
 ```
 
-> **提示**：`-l` 参数表示链接模式安装，修改源码后无需重新安装，只需重启 Gateway 即可生效。
+> `-l` 表示链接模式，修改源码后只需重启 Gateway 即可生效，无需重新安装。
 
-### 5. 验证安装
+更新源码（后续升级）：
 
 ```bash
-openclaw plugins list
+cd ~/.openclaw/extensions/openclaw-china
+git pull origin main
+pnpm install
+pnpm build
 ```
-
-确认 `@openclaw-china/wecom-app` 出现在插件列表中。
 
 ---
 
@@ -193,6 +215,8 @@ openclaw plugins list
 ### 使用命令行配置
 
 **Linux/macOS**：
+
+推荐：优先通过「配置向导」`openclaw china setup` 完成配置；下方命令用于手动配置。
 
 ```bash
 openclaw config set channels.wecom-app '{
