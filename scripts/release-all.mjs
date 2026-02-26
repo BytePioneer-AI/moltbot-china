@@ -216,6 +216,7 @@ try {
     channelsPkg.dependencies["@openclaw-china/wecom"] = nextWecom;
     channelsPkg.dependencies["@openclaw-china/wecom-app"] = nextWecomApp;
     channelsPkg.dependencies["@openclaw-china/qqbot"] = nextQqbot;
+    channelsPkg.dependencies["@openclaw-china/shared"] = nextShared;
 
     writeJson(sharedPath, sharedPkg);
     writeJson(dingtalkPath, dingtalkPkg);
@@ -290,6 +291,7 @@ try {
     channelsPkg.version = nextChannels;
     channelsPkg.dependencies = channelsPkg.dependencies ?? {};
     channelsPkg.dependencies[targetPkg.name] = nextTarget;
+    channelsPkg.dependencies["@openclaw-china/shared"] = sharedVersionToUse;
 
     writeJson(target.path, targetPkg);
     writeJson(channelsPath, channelsPkg);

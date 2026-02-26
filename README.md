@@ -130,22 +130,27 @@ openclaw china setup
 
 ```bash
 openclaw plugins install @openclaw-china/dingtalk
+openclaw china setup
 ```
 
 ```bash
 openclaw plugins install @openclaw-china/feishu-china
+openclaw china setup
 ```
 
 ```bash
 openclaw plugins install @openclaw-china/qqbot
+openclaw china setup
 ```
 
 ```bash
 openclaw plugins install @openclaw-china/wecom-app
+openclaw china setup
 ```
 
 ```bash
 openclaw plugins install @openclaw-china/wecom
+openclaw china setup
 ```
 
 #### 更新插件
