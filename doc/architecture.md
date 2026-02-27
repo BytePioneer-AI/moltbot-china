@@ -36,7 +36,7 @@ npm install @openclaw-china/feishu-china
 ## 项目结构
 
 ```
-moltbot-china/
+openclaw-china/
 ├── README.md
 ├── AGENTS.md
 ├── package.json
@@ -359,8 +359,8 @@ channels:
 
 ```bash
 # 克隆仓库
-git clone https://github.com/xxx/moltbot-china.git
-cd moltbot-china
+git clone https://github.com/xxx/openclaw-china.git
+cd openclaw-china
 
 # 安装依赖
 pnpm install

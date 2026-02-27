@@ -63,7 +63,7 @@ type Option<T extends string> = {
   label: string;
 };
 
-const PROJECT_REPO = "https://github.com/BytePioneer-AI/moltbot-china";
+const PROJECT_REPO = "https://github.com/BytePioneer-AI/openclaw-china";
 const GUIDES_BASE = "https://github.com/BytePioneer-AI/openclaw-china/tree/main/doc/guides";
 const OPENCLAW_HOME = join(homedir(), ".openclaw");
 const DEFAULT_PLUGIN_PATH = join(OPENCLAW_HOME, "extensions");

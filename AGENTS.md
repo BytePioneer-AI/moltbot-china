@@ -14,7 +14,7 @@ Moltbot China is an open-source extension set that adds China-region messaging c
 ## Project Structure
 
 ```
-moltbot-china/
+openclaw-china/
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json

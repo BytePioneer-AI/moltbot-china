@@ -11,7 +11,7 @@ export type ChinaInstallHintApiLike = {
   [key: string]: unknown;
 };
 
-const PROJECT_REPO = "https://github.com/BytePioneer-AI/moltbot-china";
+const PROJECT_REPO = "https://github.com/BytePioneer-AI/openclaw-china";
 const INSTALL_SETUP_COMMAND = "openclaw china setup";
 const START_GATEWAY_COMMAND = "openclaw gateway --port 18789 --verbose";
 const ANSI_RESET = "\u001b[0m";
