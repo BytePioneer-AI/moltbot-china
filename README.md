@@ -519,7 +519,7 @@ openclaw china setup
 
 <img src="https://github.com/user-attachments/assets/245d5730-f156-443c-908a-cf6b1f4ddbf2" alt="二维码" width="50%" />
 
-<img src="D:\work\code\moltbot-china\doc\images\image-20260228224811649.png" alt="二维码" width="50%" />
+<img src="doc\images\image-20260228224811649.png" alt="二维码" width="50%" />
 
 
 如果二维码过期，可以加下我微信备注说明来意：a28417416
