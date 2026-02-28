@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="#快速开始">快速开始</a> •
+  <a href="#总体架构">总体架构</a> •
   <a href="#功能支持">功能支持</a> •
   <a href="#更新日志">更新日志</a> •
   <a href="#演示">演示</a> •
@@ -67,7 +68,6 @@
 
   </tbody>
 </table>
-
 
 ## 功能支持
 
@@ -388,6 +388,9 @@ openclaw gateway --port 18789 --verbose
 
 ## 推荐项目
 
+<details>
+<summary><strong>点击展开推荐项目</strong></summary>
+
 ### 🤖 ClawMate - OpenClaw 角色伴侣插件
 
 > 为 OpenClaw 添加一个有温度的角色伴侣
@@ -409,6 +412,8 @@ npx github:BytePioneer-AI/clawmate
 **应用场景**：个人伴侣、虚拟导师、智能客服、专业顾问
 
 了解更多：[https://github.com/BytePioneer-AI/clawmate](https://github.com/BytePioneer-AI/clawmate)
+
+</details>
 
 ## 配置选项
 
@@ -504,6 +509,57 @@ openclaw china setup
 }
 ```
 
+
+### 总体架构
+
+> 当前架构分为宿主、统一通道聚合、各渠道插件和 shared 基础能力层。
+
+```mermaid
+%%{init: {"markdownAutoWrap": false, "flowchart": {"htmlLabels": false, "wrappingWidth": 1200}}}%%
+flowchart TD
+    %% 1. 核心宿主层 (Pill Shape)
+    HOST(["🦞 OpenClaw"]):::host
+
+    %% 2. 调度中心 (Rounded Rectangle)
+    subgraph Dispatcher [" 核心调度与分发中心 "]
+        direction TB
+        CH("📦 @openclaw-china/channels"):::aggregate
+    end
+
+    %% 3. 插件网格 (利用子图内部布局)
+    subgraph PluginGrid [" 多渠道插件生态 (Plugins) "]
+        direction LR
+        DT("DingTalk"):::plugin
+        FE("Feishu"):::plugin
+        QQ("QQBot"):::plugin
+        WC("WeCom"):::plugin
+        WA("WeCom App"):::plugin
+    end
+
+    %% 4. 基础设施层 (Rounded Rectangle)
+    subgraph SharedLayer [" 基础设施层 (Shared) "]
+        direction TB
+        SH("🛠️ @openclaw-china/shared"):::shared
+    end
+
+    %% --- 核心连接逻辑 ---
+    HOST ==>|Bootstrapping| CH
+    CH -.->|Dynamic Registration| DT
+    CH -.->|Dynamic Registration| FE
+    CH -.->|Dynamic Registration| QQ
+    CH -.->|Dynamic Registration| WC
+    CH -.->|Dynamic Registration| WA
+    DT & FE & QQ & WC & WA ==>|Dependencies| SH
+
+    %% --- 样式定义 ---
+    classDef host fill:#ebf5ff,stroke:#2563eb,stroke-width:2px,color:#1e40af,font-weight:bold
+    classDef aggregate fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#166534,font-weight:bold
+    classDef plugin fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#334155
+    classDef shared fill:#f8fafc,stroke:#334155,stroke-width:2px,stroke-dasharray: 5 5,color:#0f172a,font-weight:bold
+    style Dispatcher fill:#f8fafc,stroke:#e2e8f0,stroke-dasharray: 5 5,color:#64748b,rx:10,ry:10
+    style PluginGrid fill:#fffcf9,stroke:#fed7aa,stroke-dasharray: 5 5,color:#9a3412,rx:10,ry:10
+    style SharedLayer fill:#f8fafc,stroke:#e2e8f0,stroke-dasharray: 5 5,color:#64748b,rx:10,ry:10
+```
 </details>
 
 ## 加入交流群
