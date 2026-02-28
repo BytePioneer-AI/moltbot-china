@@ -625,14 +625,6 @@ async function configureQQBot(prompter: SetupPrompter, cfg: ConfigRoot): Promise
     existingValue: toTrimmedString(existing.clientSecret),
     required: true,
   });
-  clackNote(
-    "QQ 的 Markdown 体验很好，但需要先申请开通，详情请查看配置文档。",
-    "提示"
-  );
-  const markdownSupport = await prompter.askConfirm(
-    "启用 Markdown 支持",
-    toBoolean(existing.markdownSupport, true)
-  );
   const asrEnabled = await prompter.askConfirm(
     "启用 ASR（支持入站语音自动转文字）",
     toBoolean(existingAsr.enabled, false)
@@ -663,7 +655,6 @@ async function configureQQBot(prompter: SetupPrompter, cfg: ConfigRoot): Promise
   return mergeChannelConfig(cfg, "qqbot", {
     appId,
     clientSecret,
-    markdownSupport,
     asr,
   });
 }

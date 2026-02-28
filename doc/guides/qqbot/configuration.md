@@ -128,7 +128,6 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 | enabled | boolean | true | 是否启用 QQ 渠道 |
 | appId | string | - | QQ 机器人 AppID |
 | clientSecret | string | - | QQ 机器人 AppSecret |
-| markdownSupport | boolean | true | 是否使用 markdown 消息格式 |
 | dmPolicy | string | "open" | 私聊策略：open/pairing/allowlist |
 | groupPolicy | string | "open" | 群聊策略：open/allowlist/disabled |
 | requireMention | boolean | true | 群聊是否必须 @ 机器人 |

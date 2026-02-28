@@ -14,10 +14,7 @@
   <a href="#功能支持">功能支持</a> •
   <a href="#更新日志">更新日志</a> •
   <a href="#演示">演示</a> •
-  <a href="#推荐项目">推荐项目</a> •
-  <a href="#配置选项">配置选项</a> •
-  <a href="#开发">开发</a> •
-  <a href="#加入交流群">加入交流群</a>
+  <a href="#加入交流群"><strong>加入交流群</strong></a>
 </p>
 <p align="center">
   <strong>⭐ 如果这个项目对你有帮助，请给我们一个Star！⭐</strong><br>
@@ -99,6 +96,10 @@
 <details>
 <summary><strong>点击展开更新日志</strong></summary>
 
+### 2026-02-28
+
+- 修复企业微信插件异常重启循环问题，提升整体运行稳定性。
+
 ### 2026-02-26
 
 - 新增安装提示能力，降低首次安装和排障成本。
@@ -131,6 +132,7 @@
 #### 方式一：从 npm 安装
 
 **安装统一包（包含所有渠道）**
+
 ```bash
 openclaw plugins install @openclaw-china/channels
 openclaw china setup
@@ -378,6 +380,7 @@ openclaw gateway --port 18789 --verbose
 ## 演示
 
 以下为钉钉渠道效果示例：
+> ps: 此为最初版本的演示效果，当前已完美支持Markdown格式。
 
 ![钉钉机器人演示](doc/images/dingtalk-demo_2.gif)
 
@@ -434,6 +437,9 @@ npx github:BytePioneer-AI/clawmate
 | `per-channel-peer` | 按渠道 + 用户隔离 |
 
 ## 开发
+
+<details>
+<summary><strong>点击展开开发指南</strong></summary>
 
 适合需要二次开发或调试的场景：
 
@@ -498,6 +504,8 @@ openclaw china setup
 }
 ```
 
+</details>
+
 ## 加入交流群
 
 对 OpenClaw 用法、插件感兴趣的可以扫码加入微信群交流。
@@ -511,8 +519,7 @@ openclaw china setup
 
 <img src="https://github.com/user-attachments/assets/245d5730-f156-443c-908a-cf6b1f4ddbf2" alt="二维码" width="50%" />
 
-
-<img src="https://github.com/user-attachments/assets/39e55d57-1585-4798-9939-9f8a1ef1b1bb" alt="二维码" width="50%" />
+<img src="D:\work\code\moltbot-china\doc\images\image-20260228224811649.png" alt="二维码" width="50%" />
 
 
 如果二维码过期，可以加下我微信备注说明来意：a28417416
