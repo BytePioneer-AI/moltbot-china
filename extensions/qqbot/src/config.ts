@@ -21,7 +21,7 @@ export const QQBotConfigSchema = z.object({
       secretKey: optionalCoercedString,
     })
     .optional(),
-  markdownSupport: z.boolean().optional().default(false),
+  markdownSupport: z.boolean().optional().default(true),
   dmPolicy: z.enum(["open", "pairing", "allowlist"]).optional().default("open"),
   groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional().default("open"),
   requireMention: z.boolean().optional().default(true),

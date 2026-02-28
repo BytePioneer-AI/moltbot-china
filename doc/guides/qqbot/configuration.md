@@ -53,18 +53,9 @@
 
 <p align="center"><img src="../../images/qq-add-to-group.png" alt="添加到群聊" width="80%" /></p>
 
-可选：QQ的MarkDown支持的很好，但需要申请，且有一定的申请时间。
+**点击二维码，扫描后可直接进入QQ机器人对话窗口。**
 
-```bash
-# 申请成功后，可开通权限
-openclaw config set channels.qqbot.markdownSupport true
-```
-
-<p align="center"><img src="../../images/qq-markdown-template-enable.png" alt="QQ Markdown 模板开通入口" width="80%" /></p>
-
-供参考
-
-<p align="center"><img src="../../images/qq-markdown-template-application-form.png" alt="QQ Markdown 模板申请表" width="80%" /></p>
+![image-20260228224035048](D:\work\code\moltbot-china\doc\images\image-20260228224035048.png)
 
 
 
@@ -119,7 +110,6 @@ pnpm build
 openclaw config set channels.qqbot.enabled true
 openclaw config set channels.qqbot.appId your-app-id
 openclaw config set channels.qqbot.clientSecret your-app-secret
-openclaw config set channels.qqbot.markdownSupport false
 
 
 # 下面这些不需要配置，默认即可
@@ -138,7 +128,7 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 | enabled | boolean | true | 是否启用 QQ 渠道 |
 | appId | string | - | QQ 机器人 AppID |
 | clientSecret | string | - | QQ 机器人 AppSecret |
-| markdownSupport | boolean | false | 是否使用 markdown 消息格式（需申请） |
+| markdownSupport | boolean | true | 是否使用 markdown 消息格式 |
 | dmPolicy | string | "open" | 私聊策略：open/pairing/allowlist |
 | groupPolicy | string | "open" | 群聊策略：open/allowlist/disabled |
 | requireMention | boolean | true | 群聊是否必须 @ 机器人 |

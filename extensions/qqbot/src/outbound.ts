@@ -69,7 +69,7 @@ export const qqbotOutbound = {
 
     const target = parseTarget(to);
     const accessToken = await getAccessToken(qqCfg.appId, qqCfg.clientSecret);
-    const markdown = qqCfg.markdownSupport ?? false;
+    const markdown = qqCfg.markdownSupport ?? true;
 
     try {
       if (target.kind === "group") {

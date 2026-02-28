@@ -318,7 +318,6 @@ cp -a ~/.openclaw/extensions/openclaw-china/extensions/wecom-app/skills/wecom-ap
 openclaw config set channels.qqbot.enabled true
 openclaw config set channels.qqbot.appId your-app-id
 openclaw config set channels.qqbot.clientSecret your-app-secret
-openclaw config set channels.qqbot.markdownSupport false
 ```
 
 （可选）开启语音转文本（腾讯云 Flash ASR）：
@@ -331,8 +330,6 @@ openclaw config set channels.qqbot.asr.secretKey your-tencent-secret-key
 ```
 
 </details>
-
-MarkDown需申请相关权限。
 
 <details>
 <summary><strong>企业微信（智能机器人）</strong></summary>

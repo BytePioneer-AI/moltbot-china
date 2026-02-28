@@ -631,7 +631,7 @@ async function configureQQBot(prompter: SetupPrompter, cfg: ConfigRoot): Promise
   );
   const markdownSupport = await prompter.askConfirm(
     "启用 Markdown 支持",
-    toBoolean(existing.markdownSupport, false)
+    toBoolean(existing.markdownSupport, true)
   );
   const asrEnabled = await prompter.askConfirm(
     "启用 ASR（支持入站语音自动转文字）",

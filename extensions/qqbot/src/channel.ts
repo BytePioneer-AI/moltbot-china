@@ -43,7 +43,7 @@ function resolveQQBotAccount(params: {
     enabled: config?.enabled ?? true,
     configured,
     appId: credentials?.appId,
-    markdownSupport: config?.markdownSupport ?? false,
+    markdownSupport: config?.markdownSupport ?? true,
   };
 }
 

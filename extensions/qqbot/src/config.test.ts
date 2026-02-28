@@ -6,6 +6,7 @@ describe("QQBotConfigSchema", () => {
     const cfg = QQBotConfigSchema.parse({});
     expect(cfg.maxFileSizeMB).toBe(100);
     expect(cfg.mediaTimeoutMs).toBe(30000);
+    expect(cfg.markdownSupport).toBe(true);
   });
 
   it("rejects invalid media constraints", () => {
