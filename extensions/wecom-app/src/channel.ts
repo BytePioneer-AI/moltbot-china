@@ -653,6 +653,27 @@ export const wecomAppPlugin = {
         webhookPath: path,
         lastStartAt: Date.now(),
       });
+
+      try {
+        await new Promise<void>((resolve) => {
+          if (ctx.abortSignal?.aborted) {
+            resolve();
+            return;
+          }
+          if (!ctx.abortSignal) {
+            // Keep webhook mode alive to avoid immediate exit/restart loops.
+            return;
+          }
+          ctx.abortSignal.addEventListener("abort", () => resolve(), { once: true });
+        });
+      } finally {
+        const current = unregisterHooks.get(ctx.accountId);
+        if (current === unregister) {
+          unregisterHooks.delete(ctx.accountId);
+        }
+        unregister();
+        ctx.setStatus?.({ accountId: ctx.accountId, running: false, lastStopAt: Date.now() });
+      }
     },
 
     stopAccount: async (ctx: { accountId: string; setStatus?: (status: Record<string, unknown>) => void }): Promise<void> => {
