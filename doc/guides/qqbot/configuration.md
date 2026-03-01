@@ -134,7 +134,7 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 | allowFrom | string[] | [] | 私聊白名单 |
 | groupAllowFrom | string[] | [] | 群聊白名单 |
 | textChunkLimit | number | 1500 | 文本分块长度 |
-| replyFinalOnly | boolean | false | 是否仅发送最终回复 |
+| replyFinalOnly | boolean | false | 是否仅发送最终回复文本（不会阻断媒体工具结果，如 TTS 语音） |
 
 ---
 

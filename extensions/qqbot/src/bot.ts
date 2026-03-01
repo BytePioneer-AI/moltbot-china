@@ -560,6 +560,102 @@ function buildMediaFallbackText(mediaUrl: string, errorMessage?: string): string
   return `📎 ${mediaUrl}`;
 }
 
+const THINK_BLOCK_RE = /<think\b[^>]*>[\s\S]*?<\/think>/gi;
+const FINAL_BLOCK_RE = /<final\b[^>]*>([\s\S]*?)<\/final>/gi;
+const RAW_THINK_OR_FINAL_TAG_RE = /<\/?(?:think|final)\b[^>]*>/gi;
+const DIRECTIVE_TAG_RE =
+  /\[\[\s*(?:reply_to_current|reply_to\s*:[^\]]+|audio_as_voice|tts(?::text)?|\/tts(?::text)?)\s*\]\]/gi;
+const VOICE_EMOTION_TAG_RE =
+  /\[(?:happy|excited|calm|sad|angry|frustrated|softly|whispers|loudly|cheerfully|deadpan|sarcastically|laughs|sighs|chuckles|gasps|pause|slowly|rushed|hesitates|playfully|warmly|gently)\]/gi;
+const TTS_LIKE_RAW_TEXT_RE =
+  /\[\[\s*(?:tts(?::text)?|\/tts(?::text)?|audio_as_voice|reply_to_current|reply_to\s*:)/i;
+
+function extractFinalBlocks(text: string): string | undefined {
+  const matches = Array.from(text.matchAll(FINAL_BLOCK_RE));
+  if (matches.length === 0) return undefined;
+  return matches.map((match) => (match[1] ?? "").trim()).filter(Boolean).join("\n");
+}
+
+export function sanitizeQQBotOutboundText(rawText: string): string {
+  if (!rawText) return "";
+  let next = rawText.replace(/\r\n/g, "\n");
+
+  const finalOnly = extractFinalBlocks(next);
+  if (typeof finalOnly === "string") {
+    next = finalOnly;
+  }
+
+  next = next.replace(THINK_BLOCK_RE, "");
+  next = next.replace(RAW_THINK_OR_FINAL_TAG_RE, "");
+  next = next.replace(DIRECTIVE_TAG_RE, " ");
+  next = next.replace(VOICE_EMOTION_TAG_RE, " ");
+  next = next.replace(/[ \t]+\n/g, "\n");
+  next = next.replace(/\n{3,}/g, "\n\n");
+  next = next.trim();
+
+  if (!next) return "";
+  if (/^NO_REPLY$/i.test(next)) return "";
+  return next;
+}
+
+export function shouldSuppressQQBotTextWhenMediaPresent(rawText: string, sanitizedText: string): boolean {
+  const raw = rawText.trim();
+  if (!raw) return false;
+  if (TTS_LIKE_RAW_TEXT_RE.test(raw)) return true;
+  if (/<(?:think|final)\b/i.test(raw)) return true;
+  if (!sanitizedText) return true;
+  return !/[A-Za-z0-9\u4e00-\u9fff]/.test(sanitizedText);
+}
+
+export function evaluateReplyFinalOnlyDelivery(params: {
+  replyFinalOnly: boolean;
+  kind?: string;
+  hasMedia: boolean;
+  sanitizedText: string;
+}): { skipDelivery: boolean; suppressText: boolean } {
+  const { replyFinalOnly, kind, hasMedia } = params;
+  if (!replyFinalOnly || !kind || kind === "final") {
+    return { skipDelivery: false, suppressText: false };
+  }
+  if (hasMedia) {
+    return { skipDelivery: false, suppressText: true };
+  }
+  return { skipDelivery: true, suppressText: false };
+}
+
+export async function sendQQBotMediaWithFallback(params: {
+  qqCfg: QQBotConfig;
+  to: string;
+  mediaQueue: string[];
+  replyToId?: string;
+  logger: Logger;
+  outbound?: Pick<typeof qqbotOutbound, "sendMedia" | "sendText">;
+}): Promise<void> {
+  const { qqCfg, to, mediaQueue, replyToId, logger } = params;
+  const outbound = params.outbound ?? qqbotOutbound;
+  for (const mediaUrl of mediaQueue) {
+    const result = await outbound.sendMedia({
+      cfg: { channels: { qqbot: qqCfg } },
+      to,
+      mediaUrl,
+      replyToId,
+    });
+    if (result.error) {
+      logger.error(`sendMedia failed: ${result.error}`);
+      const fallback = buildMediaFallbackText(mediaUrl, result.error);
+      const fallbackResult = await outbound.sendText({
+        cfg: { channels: { qqbot: qqCfg } },
+        to,
+        text: fallback,
+        replyToId,
+      });
+      if (fallbackResult.error) {
+        logger.error(`sendText fallback failed: ${fallbackResult.error}`);
+      }
+    }
+  }
+}
+
 function buildInboundContext(params: {
   event: QQInboundMessage;
   sessionKey: string;
@@ -804,18 +900,16 @@ async function dispatchToAgent(params: {
   const replyFinalOnly = qqCfg.replyFinalOnly ?? false;
 
   const deliver = async (payload: unknown, info?: { kind?: string }): Promise<void> => {
-    if (replyFinalOnly && info?.kind && info.kind !== "final") return;
     const typed = payload as { text?: string; mediaUrl?: string; mediaUrls?: string[] } | undefined;
-    const rawText = typed?.text ?? "";
     const mediaLineResult = extractMediaLinesFromText({
-      text: rawText,
+      text: typed?.text ?? "",
       logger,
     });
     const localMediaResult = extractLocalMediaFromText({
       text: mediaLineResult.text,
       logger,
     });
-    const trimmed = localMediaResult.text.trim();
+    const cleanedText = sanitizeQQBotOutboundText(localMediaResult.text);
 
     const payloadMediaUrls = Array.isArray(typed?.mediaUrls)
       ? typed?.mediaUrls
@@ -837,10 +931,24 @@ async function dispatchToAgent(params: {
     for (const url of mediaLineResult.mediaUrls) addMedia(url);
     for (const url of localMediaResult.mediaUrls) addMedia(url);
 
-    if (trimmed) {
+    const deliveryDecision = evaluateReplyFinalOnlyDelivery({
+      replyFinalOnly,
+      kind: info?.kind,
+      hasMedia: mediaQueue.length > 0,
+      sanitizedText: cleanedText,
+    });
+    if (deliveryDecision.skipDelivery) return;
+
+    const suppressEchoText =
+      mediaQueue.length > 0 &&
+      shouldSuppressQQBotTextWhenMediaPresent(localMediaResult.text, cleanedText);
+    const suppressText = deliveryDecision.suppressText || suppressEchoText;
+    const textToSend = suppressText ? "" : cleanedText;
+
+    if (textToSend) {
       const converted = textApi?.convertMarkdownTables
-        ? textApi.convertMarkdownTables(trimmed, resolvedTableMode)
-        : trimmed;
+        ? textApi.convertMarkdownTables(textToSend, resolvedTableMode)
+        : textToSend;
       const chunks = chunkText(converted);
       for (const chunk of chunks) {
         const result = await qqbotOutbound.sendText({
@@ -855,27 +963,13 @@ async function dispatchToAgent(params: {
       }
     }
 
-    for (const mediaUrl of mediaQueue) {
-      const result = await qqbotOutbound.sendMedia({
-        cfg: { channels: { qqbot: qqCfg } },
-        to: target.to,
-        mediaUrl,
-        replyToId: inbound.messageId,
-      });
-      if (result.error) {
-        logger.error(`sendMedia failed: ${result.error}`);
-        const fallback = buildMediaFallbackText(mediaUrl, result.error);
-        const fallbackResult = await qqbotOutbound.sendText({
-          cfg: { channels: { qqbot: qqCfg } },
-          to: target.to,
-          text: fallback,
-          replyToId: inbound.messageId,
-        });
-        if (fallbackResult.error) {
-          logger.error(`sendText fallback failed: ${fallbackResult.error}`);
-        }
-      }
-    }
+    await sendQQBotMediaWithFallback({
+      qqCfg,
+      to: target.to,
+      mediaQueue,
+      replyToId: inbound.messageId,
+      logger,
+    });
   };
 
   const humanDelay = replyApi.resolveHumanDelayConfig?.(cfg, route.agentId);
