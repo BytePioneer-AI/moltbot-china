@@ -20,6 +20,11 @@ import {
   readMedia,
   stripTitleFromUrl,
 } from "@openclaw-china/shared";
+import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 export type QQBotFileTarget = {
   kind: "c2c" | "group";
@@ -35,6 +40,8 @@ export interface SendFileQQBotParams {
 
 const QQBOT_UNSUPPORTED_FILE_TYPE_MESSAGE =
   "QQ official C2C/group media API does not support generic files (file_type=4, e.g. PDF). Images and other supported media types are unaffected.";
+
+const require = createRequire(import.meta.url);
 
 function resolveQQBotMediaFileType(fileName: string): MediaFileType {
   const mediaType = detectMediaType(fileName);
@@ -82,6 +89,35 @@ async function uploadQQBotFile(params: {
   return upload.file_info;
 }
 
+async function convertAudioToSilk(audioPath: string): Promise<Uint8Array> {
+  const ffmpegPath = require("ffmpeg-static") as string | null;
+  if (!ffmpegPath) {
+    throw new Error("ffmpeg-static not found");
+  }
+  const silkWasm = require("silk-wasm") as {
+    encode: (pcmBuffer: Buffer, sampleRate: number) => Promise<{ data: Uint8Array }>;
+  };
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "qqbot-silk-"));
+  const pcmPath = path.join(tmpDir, "audio.pcm");
+  try {
+    execFileSync(
+      ffmpegPath,
+      ["-y", "-i", audioPath, "-f", "s16le", "-ar", "24000", "-ac", "1", pcmPath],
+      { timeout: 30000, stdio: "pipe" }
+    );
+    const pcmBuffer = fs.readFileSync(pcmPath);
+    const result = await silkWasm.encode(pcmBuffer, 24000);
+    return result.data;
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // best effort cleanup
+    }
+  }
+}
+
 export async function sendFileQQBot(params: SendFileQQBotParams): Promise<{ id: string; timestamp: number | string }> {
   const { cfg, target, mediaUrl, messageId } = params;
   if (!cfg.appId || !cfg.clientSecret) {
@@ -110,10 +146,25 @@ export async function sendFileQQBot(params: SendFileQQBotParams): Promise<{ id: 
         url: src,
       });
     } else {
-      const { buffer } = await readMediaWithConfig(src, {
-        timeout: mediaTimeoutMs,
-        maxSize: maxSizeBytes,
-      });
+      let buffer: Buffer;
+      if (fileType === MediaFileType.VOICE) {
+        try {
+          const silkData = await convertAudioToSilk(src);
+          buffer = Buffer.from(silkData);
+        } catch {
+          const local = await readMediaWithConfig(src, {
+            timeout: mediaTimeoutMs,
+            maxSize: maxSizeBytes,
+          });
+          buffer = local.buffer;
+        }
+      } else {
+        const local = await readMediaWithConfig(src, {
+          timeout: mediaTimeoutMs,
+          maxSize: maxSizeBytes,
+        });
+        buffer = local.buffer;
+      }
       fileInfo = await uploadQQBotFile({
         accessToken,
         target,
