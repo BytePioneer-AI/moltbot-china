@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+function toTrimmedString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const next = String(value).trim();
+  return next ? next : undefined;
+}
+
 const optionalCoercedString = z.preprocess(
-  (value) => {
-    if (value === undefined || value === null) return undefined;
-    const next = String(value).trim();
-    return next;
-  },
+  (value) => toTrimmedString(value),
   z.string().min(1).optional()
 );
 
@@ -100,14 +102,18 @@ export function mergeQQBotAccountConfig(cfg: PluginConfig, accountId: string): Q
 // ── Credential helpers ────────────────────────────────────────────────────────
 
 export function isConfigured(config: QQBotAccountConfig | undefined): boolean {
-  return Boolean(config?.appId && config?.clientSecret);
+  const appId = toTrimmedString(config?.appId);
+  const clientSecret = toTrimmedString(config?.clientSecret);
+  return Boolean(appId && clientSecret);
 }
 
 export function resolveQQBotCredentials(
   config: QQBotAccountConfig | undefined
 ): { appId: string; clientSecret: string } | undefined {
-  if (!config?.appId || !config?.clientSecret) return undefined;
-  return { appId: config.appId, clientSecret: config.clientSecret };
+  const appId = toTrimmedString(config?.appId);
+  const clientSecret = toTrimmedString(config?.clientSecret);
+  if (!appId || !clientSecret) return undefined;
+  return { appId, clientSecret };
 }
 
 export function resolveQQBotASRCredentials(
@@ -115,10 +121,13 @@ export function resolveQQBotASRCredentials(
 ): { appId: string; secretId: string; secretKey: string } | undefined {
   const asr = config?.asr;
   if (!asr?.enabled) return undefined;
-  if (!asr.appId || !asr.secretId || !asr.secretKey) return undefined;
+  const appId = toTrimmedString(asr.appId);
+  const secretId = toTrimmedString(asr.secretId);
+  const secretKey = toTrimmedString(asr.secretKey);
+  if (!appId || !secretId || !secretKey) return undefined;
   return {
-    appId: asr.appId,
-    secretId: asr.secretId,
-    secretKey: asr.secretKey,
+    appId,
+    secretId,
+    secretKey,
   };
 }

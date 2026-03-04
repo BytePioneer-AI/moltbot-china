@@ -3,6 +3,7 @@
  * 支持多账户并发连接
  */
 import WebSocket from "ws";
+import { HttpError } from "@openclaw-china/shared";
 import { createLogger, type Logger } from "./logger.js";
 import { handleQQBotDispatch } from "./bot.js";
 import {
@@ -39,6 +40,17 @@ const DEFAULT_INTENTS =
   INTENTS.GUILD_MESSAGES | INTENTS.DIRECT_MESSAGE | INTENTS.GROUP_AND_C2C;
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000, 30000];
+
+function formatGatewayConnectError(err: unknown): string {
+  if (err instanceof HttpError) {
+    const body = err.body?.trim();
+    if (body) {
+      return `${err.message}; body=${body}`;
+    }
+    return err.message;
+  }
+  return String(err);
+}
 
 /**
  * 活动连接状态（每个账户独立）
@@ -323,7 +335,7 @@ export async function monitorQQBotProvider(opts: MonitorQQBotOpts = {}): Promise
           logger.error(`gateway socket error: ${String(err)}`);
         });
       } catch (err) {
-        logger.error(`gateway connect failed: ${String(err)}`);
+        logger.error(`gateway connect failed: ${formatGatewayConnectError(err)}`);
         cleanupSocket(conn);
         scheduleReconnect("connect failed");
       } finally {

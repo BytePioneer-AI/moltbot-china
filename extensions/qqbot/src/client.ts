@@ -15,6 +15,20 @@ const tokenPromiseMap = new Map<string, Promise<string>>();
 
 const msgSeqMap = new Map<string, number>();
 
+function toTrimmedString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const next = String(value).trim();
+  return next ? next : undefined;
+}
+
+function requireTrimmedString(value: unknown, field: string): string {
+  const normalized = toTrimmedString(value);
+  if (!normalized) {
+    throw new Error(`QQBot ${field} is empty`);
+  }
+  return normalized;
+}
+
 function nextMsgSeq(messageId?: string): number {
   if (!messageId) return MSG_SEQ_BASE + 1;
   const current = msgSeqMap.get(messageId) ?? 0;
@@ -29,10 +43,11 @@ function nextMsgSeq(messageId?: string): number {
   return MSG_SEQ_BASE + next;
 }
 
-export function clearTokenCache(appId?: string): void {
-  if (appId) {
-    tokenCacheMap.delete(appId);
-    tokenPromiseMap.delete(appId);
+export function clearTokenCache(appId?: string | number): void {
+  const normalizedAppId = toTrimmedString(appId);
+  if (normalizedAppId) {
+    tokenCacheMap.delete(normalizedAppId);
+    tokenPromiseMap.delete(normalizedAppId);
   } else {
     tokenCacheMap.clear();
     tokenPromiseMap.clear();
@@ -40,16 +55,19 @@ export function clearTokenCache(appId?: string): void {
 }
 
 export async function getAccessToken(
-  appId: string,
-  clientSecret: string,
+  appId: string | number,
+  clientSecret: string | number,
   options?: HttpRequestOptions
 ): Promise<string> {
-  const cached = tokenCacheMap.get(appId);
+  const normalizedAppId = requireTrimmedString(appId, "appId");
+  const normalizedClientSecret = requireTrimmedString(clientSecret, "clientSecret");
+
+  const cached = tokenCacheMap.get(normalizedAppId);
   if (cached && Date.now() < cached.expiresAt - 5 * 60 * 1000) {
     return cached.token;
   }
 
-  const existingPromise = tokenPromiseMap.get(appId);
+  const existingPromise = tokenPromiseMap.get(normalizedAppId);
   if (existingPromise) {
     return existingPromise;
   }
@@ -58,7 +76,7 @@ export async function getAccessToken(
     try {
       const data = await httpPost<{ access_token?: string; expires_in?: number }>(
         TOKEN_URL,
-        { appId, clientSecret },
+        { appId: normalizedAppId, clientSecret: normalizedClientSecret },
         { timeout: options?.timeout ?? 15000 }
       );
 
@@ -66,17 +84,17 @@ export async function getAccessToken(
         throw new Error("access_token missing from QQ response");
       }
 
-      tokenCacheMap.set(appId, {
+      tokenCacheMap.set(normalizedAppId, {
         token: data.access_token,
         expiresAt: Date.now() + (data.expires_in ?? 7200) * 1000,
       });
       return data.access_token;
     } finally {
-      tokenPromiseMap.delete(appId);
+      tokenPromiseMap.delete(normalizedAppId);
     }
   })();
 
-  tokenPromiseMap.set(appId, promise);
+  tokenPromiseMap.set(normalizedAppId, promise);
   return promise;
 }
 

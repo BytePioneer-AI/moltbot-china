@@ -28,14 +28,14 @@ const plugin = {
       enabled: { type: "boolean" },
       name: { type: "string" },
       defaultAccount: { type: "string" },
-      appId: { type: "string" },
+      appId: { type: ["string", "number"] },
       clientSecret: { type: "string" },
       asr: {
         type: "object",
         additionalProperties: false,
         properties: {
           enabled: { type: "boolean" },
-          appId: { type: "string" },
+          appId: { type: ["string", "number"] },
           secretId: { type: "string" },
           secretKey: { type: "string" }
         }
@@ -59,14 +59,14 @@ const plugin = {
           properties: {
             name: { type: "string" },
             enabled: { type: "boolean" },
-            appId: { type: "string" },
+            appId: { type: ["string", "number"] },
             clientSecret: { type: "string" },
             asr: {
               type: "object",
               additionalProperties: false,
               properties: {
                 enabled: { type: "boolean" },
-                appId: { type: "string" },
+                appId: { type: ["string", "number"] },
                 secretId: { type: "string" },
                 secretKey: { type: "string" }
               }
