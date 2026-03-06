@@ -21,6 +21,7 @@ export interface MonitorQQBotOpts {
   };
   abortSignal?: AbortSignal;
   accountId?: string;
+  setStatus?: (status: Record<string, unknown>) => void;
 }
 
 type GatewayPayload = {
@@ -125,7 +126,7 @@ function cleanupSocket(conn: ActiveConnection): void {
 }
 
 export async function monitorQQBotProvider(opts: MonitorQQBotOpts = {}): Promise<void> {
-  const { config, runtime, abortSignal, accountId = DEFAULT_ACCOUNT_ID } = opts;
+  const { config, runtime, abortSignal, accountId = DEFAULT_ACCOUNT_ID, setStatus } = opts;
   const logger = createLogger("qqbot", {
     log: runtime?.log,
     error: runtime?.error,
@@ -251,6 +252,8 @@ export async function monitorQQBotProvider(opts: MonitorQQBotOpts = {}): Promise
           return;
         }
         case 11:
+          // Heartbeat ACK - 更新 lastEventAt 让 OpenClaw 健康检查感知连接存活
+          setStatus?.({ lastEventAt: Date.now() });
           return;
         case 7:
           cleanupSocket(conn);

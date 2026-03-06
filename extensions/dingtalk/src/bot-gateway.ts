@@ -19,6 +19,7 @@ export interface MonitorDingtalkOpts {
   };
   abortSignal?: AbortSignal;
   accountId?: string;
+  setStatus?: (status: Record<string, unknown>) => void;
 }
 
 type DingtalkGatewayState =
@@ -235,8 +236,9 @@ async function runGatewaySession(params: {
   signal: AbortSignal;
   metrics: GatewayMetrics;
   stateRef: TransitionRef;
+  setStatus?: (status: Record<string, unknown>) => void;
 }): Promise<SessionResult> {
-  const { client, config, accountId, logger, signal, metrics, stateRef } = params;
+  const { client, config, accountId, logger, signal, metrics, stateRef, setStatus } = params;
   transitionState({ ref: stateRef, next: "connecting", logger });
 
   let hasInboundTraffic = false;
@@ -318,6 +320,8 @@ async function runGatewaySession(params: {
     if (connected && registered) {
       disconnectedAt = null;
       transitionState({ ref: stateRef, next: "running", logger });
+      // 连接正常时更新 lastEventAt，让 OpenClaw 健康检查感知连接存活
+      setStatus?.({ lastEventAt: Date.now() });
     } else if (connected && hasInboundTraffic) {
       disconnectedAt = null;
       transitionState({
@@ -328,6 +332,8 @@ async function runGatewaySession(params: {
       });
     } else if (connected) {
       transitionState({ ref: stateRef, next: "connected", logger });
+      // 即使未 registered，只要 connected 就上报心跳
+      setStatus?.({ lastEventAt: Date.now() });
     } else if (firstConnectedAt !== null) {
       if (disconnectedAt === null) {
         disconnectedAt = now;
@@ -359,8 +365,9 @@ async function runGatewayLoop(params: {
   accountId: string;
   logger: Logger;
   signal: AbortSignal;
+  setStatus?: (status: Record<string, unknown>) => void;
 }): Promise<void> {
-  const { config, dingtalkCfg, accountId, logger, signal } = params;
+  const { config, dingtalkCfg, accountId, logger, signal, setStatus } = params;
   const metrics = createGatewayMetrics();
   const stateRef: TransitionRef = { state: "idle" };
 
@@ -390,6 +397,7 @@ async function runGatewayLoop(params: {
         signal,
         metrics,
         stateRef,
+        setStatus,
       });
     } catch (err) {
       logger.error(`[gateway] fatal session error: ${String(err)}`);
@@ -434,7 +442,7 @@ async function runGatewayLoop(params: {
 }
 
 export async function monitorDingtalkProvider(opts: MonitorDingtalkOpts = {}): Promise<void> {
-  const { config, runtime, abortSignal, accountId = "default" } = opts;
+  const { config, runtime, abortSignal, accountId = "default", setStatus } = opts;
   const logger: Logger = createLogger("dingtalk", {
     log: runtime?.log,
     error: runtime?.error,
@@ -480,6 +488,7 @@ export async function monitorDingtalkProvider(opts: MonitorDingtalkOpts = {}): P
     accountId,
     logger,
     signal: stopSignal,
+    setStatus,
   }).finally(() => {
     abortSignal?.removeEventListener("abort", onAbort);
     if (currentPromise === runPromise) {

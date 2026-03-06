@@ -364,6 +364,7 @@ export const qqbotPlugin = {
           },
         abortSignal: ctx.abortSignal,
         accountId: ctx.accountId,
+        setStatus: ctx.setStatus,
       });
     },
     stopAccount: async (ctx: { accountId: string }): Promise<void> => {

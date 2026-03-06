@@ -320,6 +320,7 @@ export const dingtalkPlugin = {
           },
         abortSignal: ctx.abortSignal,
         accountId: ctx.accountId,
+        setStatus: ctx.setStatus,
       });
     },
   },
