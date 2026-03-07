@@ -575,7 +575,6 @@ flowchart TD
 ## 💗 支持我
 
 这是一个公益项目，感谢支持。本项目由我利用休息时间开发维护，未来会持续更新与支持。当前不接受捐助；如希望支持作者，可以去小店支持一下：<a href="https://openaichat.top/">https://openaichat.top/</a>
-附赠作者1对1 OpenClaw 咨询服务，购买后，您可以联系社群群主获取使用建议和技术支持。感谢支持~
 
 <table>
   <tr>
@@ -604,11 +603,12 @@ flowchart TD
 - 插件**BUG**建议提交**issue**
 
 **欢迎同学们一起开发~**
+![bd0dc50d3216641c9397bbceb7386844]()
+
+
+<img src="https://github.com/user-attachments/assets/139969ac-8176-410b-8556-d9f15a3a11d1" alt="二维码" width="50%" />
 
 <img src="https://github.com/user-attachments/assets/c3d7115b-b561-49ef-9f8e-1787c00ba6d8" alt="二维码" width="50%" />
-
-<img src="https://github.com/user-attachments/assets/ecbae9f1-7780-41ed-9e92-c6aa489ba20e" alt="二维码" width="50%" />
-
 
 
 如果二维码过期，可以加下我微信备注说明来意：a28417416
