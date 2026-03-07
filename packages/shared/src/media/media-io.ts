@@ -647,7 +647,21 @@ export async function finalizeInboundMediaFile(
     await fsPromises.mkdir(datedDir, { recursive: true });
     await fsPromises.rename(current, target);
     return target;
-  } catch {
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code ?? "";
+    if (code === "EXDEV") {
+      try {
+        await fsPromises.copyFile(current, target);
+        try {
+          await fsPromises.unlink(current);
+        } catch {
+          // unlink 失败不影响结果，目标文件已可用
+        }
+        return target;
+      } catch {
+        return current;
+      }
+    }
     return current;
   }
 }

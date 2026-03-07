@@ -9,7 +9,7 @@ import {
   resolveInboundMediaKeepDays,
   resolveApiBaseUrl,
 } from "./config.js";
-import { mkdir, writeFile, unlink, rename, readdir, stat } from "node:fs/promises";
+import { mkdir, writeFile, unlink, rename, copyFile, readdir, stat } from "node:fs/promises";
 import { basename, join, extname } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -63,7 +63,21 @@ export async function finalizeInboundMedia(account: ResolvedWecomAppAccount, fil
   try {
     await rename(p, dest);
     return dest;
-  } catch {
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code ?? "";
+    if (code === "EXDEV") {
+      try {
+        await copyFile(p, dest);
+        try {
+          await unlink(p);
+        } catch {
+          // unlink 失败不影响结果，目标文件已可用
+        }
+        return dest;
+      } catch {
+        // 复制失败走下面删除行为
+      }
+    }
     // 移动失败就退化为“尽力删除”（避免 tmp 爆炸），但不抛出
     try {
       await unlink(p);
