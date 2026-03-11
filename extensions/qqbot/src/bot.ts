@@ -827,10 +827,7 @@ export function resolveQQBotTextReplyRefs(params: {
   replyToId?: string;
   replyEventId?: string;
 } {
-  const forceProactive =
-    params.markdownSupport &&
-    isQQBotC2CTarget(params.to) &&
-    hasQQBotMarkdownTable(params.text);
+  const forceProactive = params.markdownSupport && isQQBotC2CTarget(params.to);
 
   if (!forceProactive) {
     return {
@@ -1238,19 +1235,19 @@ async function dispatchToAgent(params: {
 
     const replyFinalOnly = qqCfg.replyFinalOnly ?? false;
     const markdownSupport = qqCfg.markdownSupport ?? true;
-    let bufferingProactiveTableReply = false;
-    let bufferedProactiveTableTexts: string[] = [];
+    let bufferingProactiveMarkdownReply = false;
+    let bufferedProactiveMarkdownTexts: string[] = [];
 
-    const flushBufferedProactiveTableReply = async (): Promise<void> => {
-      if (!bufferingProactiveTableReply || bufferedProactiveTableTexts.length === 0) {
-        bufferingProactiveTableReply = false;
-        bufferedProactiveTableTexts = [];
+    const flushBufferedProactiveMarkdownReply = async (): Promise<void> => {
+      if (!bufferingProactiveMarkdownReply || bufferedProactiveMarkdownTexts.length === 0) {
+        bufferingProactiveMarkdownReply = false;
+        bufferedProactiveMarkdownTexts = [];
         return;
       }
 
-      const combinedText = bufferedProactiveTableTexts.join("\n\n").trim();
-      bufferingProactiveTableReply = false;
-      bufferedProactiveTableTexts = [];
+      const combinedText = bufferedProactiveMarkdownTexts.join("\n\n").trim();
+      bufferingProactiveMarkdownReply = false;
+      bufferedProactiveMarkdownTexts = [];
       if (!combinedText) return;
       const normalizedCombinedText = normalizeQQBotRenderedMarkdown(combinedText);
 
@@ -1260,7 +1257,7 @@ async function dispatchToAgent(params: {
         text: normalizedCombinedText,
       });
       if (result.error) {
-        logger.error(`send buffered proactive table reply failed: ${result.error}`);
+        logger.error(`send buffered proactive markdown reply failed: ${result.error}`);
         markGroupMessageInterfaceBlocked(result.error);
       } else {
         logger.info(`sent buffered proactive QQ markdown reply (len=${normalizedCombinedText.length})`);
@@ -1321,14 +1318,14 @@ async function dispatchToAgent(params: {
           replyToId: inbound.messageId,
           replyEventId: inbound.eventId,
         });
-        const shouldBufferProactiveTableReply =
-          bufferingProactiveTableReply || textReplyRefs.forceProactive;
-        if (shouldBufferProactiveTableReply) {
-          if (!bufferingProactiveTableReply) {
-            logger.info("C2C markdown table detected; buffering final proactive QQ message to preserve table rendering");
+        const shouldBufferProactiveMarkdownReply =
+          bufferingProactiveMarkdownReply || textReplyRefs.forceProactive;
+        if (shouldBufferProactiveMarkdownReply) {
+          if (!bufferingProactiveMarkdownReply) {
+            logger.info("C2C markdown reply detected; buffering final proactive QQ message to preserve markdown rendering");
           }
-          bufferingProactiveTableReply = true;
-          bufferedProactiveTableTexts = appendQQBotBufferedText(bufferedProactiveTableTexts, converted);
+          bufferingProactiveMarkdownReply = true;
+          bufferedProactiveMarkdownTexts = appendQQBotBufferedText(bufferedProactiveMarkdownTexts, converted);
         } else {
           const chunks = chunkText(converted);
           for (const chunk of chunks) {
@@ -1384,7 +1381,7 @@ async function dispatchToAgent(params: {
           },
         },
       });
-      await flushBufferedProactiveTableReply();
+      await flushBufferedProactiveMarkdownReply();
     } else {
       const dispatcherResult = replyApi.createReplyDispatcherWithTyping
         ? replyApi.createReplyDispatcherWithTyping({
@@ -1419,7 +1416,7 @@ async function dispatchToAgent(params: {
       });
 
       dispatcherResult.markDispatchIdle?.();
-      await flushBufferedProactiveTableReply();
+      await flushBufferedProactiveMarkdownReply();
     }
 
     const noReplyFallback = resolveQQBotNoReplyFallback({

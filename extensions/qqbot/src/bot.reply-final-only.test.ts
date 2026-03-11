@@ -130,7 +130,7 @@ describe("resolveQQBotTextReplyRefs", () => {
     });
   });
 
-  it("keeps passive reply refs for plain c2c text", () => {
+  it("drops passive reply refs for plain c2c text when markdown is enabled", () => {
     const refs = resolveQQBotTextReplyRefs({
       to: "user:u-1",
       text: "普通文本回复",
@@ -140,9 +140,9 @@ describe("resolveQQBotTextReplyRefs", () => {
     });
 
     expect(refs).toEqual({
-      forceProactive: false,
-      replyToId: "reply-2",
-      replyEventId: "event-2",
+      forceProactive: true,
+      replyToId: undefined,
+      replyEventId: undefined,
     });
   });
 
@@ -159,6 +159,22 @@ describe("resolveQQBotTextReplyRefs", () => {
       forceProactive: false,
       replyToId: "reply-3",
       replyEventId: "event-3",
+    });
+  });
+
+  it("keeps passive reply refs when markdown support is disabled", () => {
+    const refs = resolveQQBotTextReplyRefs({
+      to: "user:u-1",
+      text: "# 普通文本回复",
+      markdownSupport: false,
+      replyToId: "reply-4",
+      replyEventId: "event-4",
+    });
+
+    expect(refs).toEqual({
+      forceProactive: false,
+      replyToId: "reply-4",
+      replyEventId: "event-4",
     });
   });
 });
