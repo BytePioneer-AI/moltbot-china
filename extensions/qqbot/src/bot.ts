@@ -62,13 +62,22 @@ type QQBotAgentRoute = {
   accountId: string;
   agentId?: string;
   mainSessionKey?: string;
+  effectiveSessionKey?: string;
 };
 
 const sessionDispatchQueue = new Map<string, Promise<void>>();
 
+function resolveQQBotRouteSessionKey(route: QQBotAgentRoute): string {
+  const effectiveSessionKey = route.effectiveSessionKey?.trim();
+  if (effectiveSessionKey) {
+    return effectiveSessionKey;
+  }
+  return route.sessionKey;
+}
+
 function buildSessionDispatchQueueKey(route: QQBotAgentRoute): string {
   const accountId = route.accountId?.trim() || DEFAULT_ACCOUNT_ID;
-  return `${accountId}:${route.sessionKey}`;
+  return `${accountId}:${resolveQQBotRouteSessionKey(route)}`;
 }
 
 async function runSerializedSessionDispatch<T>(
@@ -589,6 +598,25 @@ function resolveChatTarget(event: QQInboundMessage): { to: string; peerId: strin
     peerId: event.senderId,
     peerKind: "dm",
   };
+}
+
+function resolveQQBotEffectiveSessionKey(params: {
+  inbound: QQInboundMessage;
+  route: QQBotAgentRoute;
+  accountId: string;
+}): string {
+  const { inbound, route, accountId } = params;
+  if (inbound.type !== "direct") {
+    return route.sessionKey;
+  }
+
+  const senderStableId = inbound.c2cOpenid?.trim() || inbound.senderId?.trim();
+  if (!senderStableId) {
+    return route.sessionKey;
+  }
+
+  const resolvedAccountId = route.accountId?.trim() || accountId.trim() || DEFAULT_ACCOUNT_ID;
+  return `qqbot:dm:${resolvedAccountId}:${senderStableId}`;
 }
 
 function resolveEnvelopeFrom(event: QQInboundMessage): string {
@@ -1125,6 +1153,7 @@ async function dispatchToAgent(params: {
 }): Promise<void> {
   const { inbound, cfg, qqCfg, accountId, logger, route } = params;
   const runtime = getQQBotRuntime();
+  const routeSessionKey = resolveQQBotRouteSessionKey(route);
   const target = resolveChatTarget(inbound);
   if (inbound.c2cOpenid) {
     const typing = await qqbotOutbound.sendTyping({
@@ -1193,7 +1222,7 @@ async function dispatchToAgent(params: {
     const envelopeOptions = replyApi.resolveEnvelopeFormatOptions?.(cfg);
     const previousTimestamp =
       storePath && sessionApi?.readSessionUpdatedAt
-        ? sessionApi.readSessionUpdatedAt({ storePath, sessionKey: route.sessionKey })
+        ? sessionApi.readSessionUpdatedAt({ storePath, sessionKey: routeSessionKey })
         : null;
     const resolvedAttachmentResult = await resolveInboundAttachmentsForAgent({
       attachments: inbound.attachments,
@@ -1256,7 +1285,7 @@ async function dispatchToAgent(params: {
 
     const inboundCtx = buildInboundContext({
       event: inbound,
-      sessionKey: route.sessionKey,
+      sessionKey: routeSessionKey,
       accountId: route.accountId ?? accountId,
       body: inboundBody,
       rawBody,
@@ -1286,16 +1315,11 @@ async function dispatchToAgent(params: {
 
     if (storePath && sessionApi?.recordInboundSession) {
       try {
-        const mainSessionKeyRaw = (route as Record<string, unknown>)?.mainSessionKey;
-        const mainSessionKey =
-          typeof mainSessionKeyRaw === "string" && mainSessionKeyRaw.trim()
-            ? mainSessionKeyRaw
-            : undefined;
         const isGroup = inbound.type === "group" || inbound.type === "channel";
         const updateLastRoute =
           !isGroup
             ? {
-                sessionKey: mainSessionKey ?? route.sessionKey,
+                sessionKey: routeSessionKey,
                 channel: "qqbot",
                 to: (finalCtx.OriginatingTo ?? finalCtx.To ?? `user:${inbound.senderId}`) as string,
                 accountId: route.accountId ?? accountId,
@@ -1305,7 +1329,7 @@ async function dispatchToAgent(params: {
         const recordSessionKey =
           typeof finalCtx.SessionKey === "string" && finalCtx.SessionKey.trim()
             ? finalCtx.SessionKey
-            : route.sessionKey;
+            : routeSessionKey;
 
         await sessionApi.recordInboundSession({
           storePath,
@@ -1733,9 +1757,18 @@ export async function handleQQBotDispatch(params: DispatchParams): Promise<void>
     accountId,
     peer: { kind: target.peerKind, id: target.peerId },
   }) as QQBotAgentRoute;
-  const queueKey = buildSessionDispatchQueueKey(route);
+  const effectiveSessionKey = resolveQQBotEffectiveSessionKey({
+    inbound,
+    route,
+    accountId,
+  });
+  const resolvedRoute =
+    effectiveSessionKey === route.sessionKey
+      ? route
+      : { ...route, effectiveSessionKey };
+  const queueKey = buildSessionDispatchQueueKey(resolvedRoute);
   if (sessionDispatchQueue.has(queueKey)) {
-    logger.info(`session busy; queueing inbound dispatch sessionKey=${route.sessionKey}`);
+    logger.info(`session busy; queueing inbound dispatch sessionKey=${resolveQQBotRouteSessionKey(resolvedRoute)}`);
   }
 
   await runSerializedSessionDispatch(queueKey, async () =>
@@ -1745,7 +1778,7 @@ export async function handleQQBotDispatch(params: DispatchParams): Promise<void>
       qqCfg,
       accountId,
       logger,
-      route,
+      route: resolvedRoute,
     })
   );
 }

@@ -34,6 +34,50 @@ function createLogger() {
   };
 }
 
+function setupSessionRuntime(params?: {
+  routeResolver?: (input: {
+    cfg: unknown;
+    channel: string;
+    accountId?: string;
+    peer: { kind: string; id: string };
+  }) => { sessionKey: string; accountId: string; agentId?: string };
+  dispatchReplyWithBufferedBlockDispatcher?: ReturnType<typeof vi.fn>;
+}) {
+  const readSessionUpdatedAt = vi.fn().mockReturnValue(null);
+  const recordInboundSession = vi.fn().mockResolvedValue(undefined);
+  const dispatchReplyWithBufferedBlockDispatcher =
+    params?.dispatchReplyWithBufferedBlockDispatcher ?? vi.fn().mockResolvedValue(undefined);
+
+  setQQBotRuntime({
+    channel: {
+      routing: {
+        resolveAgentRoute:
+          params?.routeResolver ??
+          ((input) => ({
+            sessionKey: "shared-session",
+            accountId: input.accountId ?? "default",
+            agentId: "main",
+          })),
+      },
+      reply: {
+        finalizeInboundContext: (ctx: unknown) => ctx,
+        dispatchReplyWithBufferedBlockDispatcher,
+      },
+      session: {
+        resolveStorePath: () => "memory://qqbot",
+        readSessionUpdatedAt,
+        recordInboundSession,
+      },
+    },
+  });
+
+  return {
+    readSessionUpdatedAt,
+    recordInboundSession,
+    dispatchReplyWithBufferedBlockDispatcher,
+  };
+}
+
 const baseCfg = {
   channels: {
     qqbot: {
@@ -299,7 +343,7 @@ describe("QQBot inbound known-target recording", () => {
 
     expect(dispatchReplyWithBufferedBlockDispatcher).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining("session busy; queueing inbound dispatch sessionKey=shared-session")
+      expect.stringContaining("session busy; queueing inbound dispatch sessionKey=qqbot:dm:default:u-serial")
     );
 
     releaseFirstDispatch?.();
@@ -308,5 +352,356 @@ describe("QQBot inbound known-target recording", () => {
 
     expect(dispatchReplyWithBufferedBlockDispatcher).toHaveBeenCalledTimes(2);
     expect(maxActiveDispatches).toBe(1);
+  });
+});
+
+describe("QQBot direct session isolation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    outboundMocks.sendTyping.mockResolvedValue({ channel: "qqbot" });
+    outboundMocks.sendText.mockResolvedValue({ channel: "qqbot", messageId: "m-1", timestamp: 1 });
+    outboundMocks.sendMedia.mockResolvedValue({ channel: "qqbot", messageId: "m-2", timestamp: 2 });
+  });
+
+  afterEach(() => {
+    clearQQBotRuntime();
+  });
+
+  it("uses per-user direct session keys for different C2C users", async () => {
+    const logger = createLogger();
+    const sessionRuntime = setupSessionRuntime();
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-user-1",
+        content: "hello one",
+        timestamp: 1700000001000,
+        author: {
+          user_openid: "u-100",
+          username: "User One",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-user-2",
+        content: "hello two",
+        timestamp: 1700000002000,
+        author: {
+          user_openid: "u-200",
+          username: "User Two",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    expect(sessionRuntime.readSessionUpdatedAt).toHaveBeenNthCalledWith(1, {
+      storePath: "memory://qqbot",
+      sessionKey: "qqbot:dm:default:u-100",
+    });
+    expect(sessionRuntime.readSessionUpdatedAt).toHaveBeenNthCalledWith(2, {
+      storePath: "memory://qqbot",
+      sessionKey: "qqbot:dm:default:u-200",
+    });
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:default:u-100",
+        updateLastRoute: expect.objectContaining({
+          sessionKey: "qqbot:dm:default:u-100",
+        }),
+      })
+    );
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:default:u-200",
+        updateLastRoute: expect.objectContaining({
+          sessionKey: "qqbot:dm:default:u-200",
+        }),
+      })
+    );
+    expect(
+      sessionRuntime.dispatchReplyWithBufferedBlockDispatcher.mock.calls[0]?.[0]?.ctx?.SessionKey
+    ).toBe("qqbot:dm:default:u-100");
+    expect(
+      sessionRuntime.dispatchReplyWithBufferedBlockDispatcher.mock.calls[1]?.[0]?.ctx?.SessionKey
+    ).toBe("qqbot:dm:default:u-200");
+  });
+
+  it("keeps a stable direct session key for repeated messages from the same user", async () => {
+    const logger = createLogger();
+    const sessionRuntime = setupSessionRuntime();
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-stable-1",
+        content: "first",
+        timestamp: 1700000003000,
+        author: {
+          user_openid: "u-stable",
+          username: "Stable User",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-stable-2",
+        content: "second",
+        timestamp: 1700000004000,
+        author: {
+          user_openid: "u-stable",
+          username: "Stable User",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    expect(sessionRuntime.readSessionUpdatedAt).toHaveBeenCalledTimes(2);
+    expect(sessionRuntime.readSessionUpdatedAt).toHaveBeenNthCalledWith(1, {
+      storePath: "memory://qqbot",
+      sessionKey: "qqbot:dm:default:u-stable",
+    });
+    expect(sessionRuntime.readSessionUpdatedAt).toHaveBeenNthCalledWith(2, {
+      storePath: "memory://qqbot",
+      sessionKey: "qqbot:dm:default:u-stable",
+    });
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:default:u-stable",
+      })
+    );
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:default:u-stable",
+      })
+    );
+  });
+
+  it("isolates the same direct sender across different qqbot accounts", async () => {
+    const logger = createLogger();
+    const sessionRuntime = setupSessionRuntime({
+      routeResolver: (input) => ({
+        sessionKey: "shared-direct-session",
+        accountId: input.accountId ?? "default",
+        agentId: "main",
+      }),
+    });
+    const multiAccountCfg = {
+      channels: {
+        qqbot: {
+          ...baseCfg.channels.qqbot,
+          accounts: {
+            bot2: {
+              enabled: true,
+              appId: "app-2",
+              clientSecret: "secret-2",
+            },
+          },
+        },
+      },
+    };
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-account-1",
+        content: "hello default",
+        timestamp: 1700000005000,
+        author: {
+          user_openid: "u-same",
+          username: "Same User",
+        },
+      },
+      cfg: multiAccountCfg,
+      accountId: "default",
+      logger,
+    });
+
+    await handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-account-2",
+        content: "hello bot2",
+        timestamp: 1700000006000,
+        author: {
+          user_openid: "u-same",
+          username: "Same User",
+        },
+      },
+      cfg: multiAccountCfg,
+      accountId: "bot2",
+      logger,
+    });
+
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:default:u-same",
+      })
+    );
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionKey: "qqbot:dm:bot2:u-same",
+      })
+    );
+  });
+
+  it("keeps group and channel session keys from routing", async () => {
+    const logger = createLogger();
+    const sessionRuntime = setupSessionRuntime({
+      routeResolver: (input) => {
+        if (input.peer.id.startsWith("group:")) {
+          return { sessionKey: "route-group-session", accountId: input.accountId ?? "default", agentId: "main" };
+        }
+        if (input.peer.id.startsWith("channel:")) {
+          return { sessionKey: "route-channel-session", accountId: input.accountId ?? "default", agentId: "main" };
+        }
+        return { sessionKey: "route-direct-session", accountId: input.accountId ?? "default", agentId: "main" };
+      },
+    });
+
+    await handleQQBotDispatch({
+      eventType: "GROUP_AT_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-group-session",
+        content: "hello group",
+        timestamp: 1700000007000,
+        group_openid: "g-route",
+        author: {
+          member_openid: "member-route",
+          nickname: "Route Group User",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    await handleQQBotDispatch({
+      eventType: "AT_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-channel-session",
+        content: "hello channel",
+        timestamp: 1700000008000,
+        channel_id: "channel-route",
+        guild_id: "guild-route",
+        author: {
+          id: "channel-user",
+          username: "Route Channel User",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionKey: "route-group-session",
+      })
+    );
+    expect(sessionRuntime.recordInboundSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionKey: "route-channel-session",
+      })
+    );
+  });
+
+  it("allows concurrent direct dispatches for different users even when routing returns the same session", async () => {
+    const logger = createLogger();
+    let activeDispatches = 0;
+    let maxActiveDispatches = 0;
+    let enteredDispatches = 0;
+    let resolveBothEntered: (() => void) | undefined;
+    let releaseDispatches: (() => void) | undefined;
+
+    const bothEntered = new Promise<void>((resolve) => {
+      resolveBothEntered = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseDispatches = resolve;
+    });
+
+    const dispatchReplyWithBufferedBlockDispatcher = vi.fn(async () => {
+      activeDispatches += 1;
+      enteredDispatches += 1;
+      maxActiveDispatches = Math.max(maxActiveDispatches, activeDispatches);
+
+      if (enteredDispatches === 2) {
+        resolveBothEntered?.();
+      }
+
+      await release;
+      activeDispatches -= 1;
+    });
+
+    setupSessionRuntime({
+      dispatchReplyWithBufferedBlockDispatcher,
+    });
+
+    const firstDispatch = handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-parallel-1",
+        content: "hello first user",
+        timestamp: 1700000009000,
+        author: {
+          user_openid: "u-parallel-1",
+          username: "Parallel User One",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    const secondDispatch = handleQQBotDispatch({
+      eventType: "C2C_MESSAGE_CREATE",
+      eventData: {
+        id: "msg-parallel-2",
+        content: "hello second user",
+        timestamp: 1700000010000,
+        author: {
+          user_openid: "u-parallel-2",
+          username: "Parallel User Two",
+        },
+      },
+      cfg: baseCfg,
+      accountId: "default",
+      logger,
+    });
+
+    await bothEntered;
+
+    expect(dispatchReplyWithBufferedBlockDispatcher).toHaveBeenCalledTimes(2);
+    expect(activeDispatches).toBe(2);
+
+    releaseDispatches?.();
+
+    await Promise.all([firstDispatch, secondDispatch]);
+
+    expect(maxActiveDispatches).toBe(2);
   });
 });
