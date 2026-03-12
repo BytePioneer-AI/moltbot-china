@@ -66,6 +66,35 @@
   </tbody>
 </table>
 
+## 谁在使用
+
+<p align="center">
+  <strong>目前已知已有以下公司 / 团队在使用 OpenClaw China</strong>
+</p>
+
+<table align="center">
+  <tbody>
+    <tr>
+      <td align="center" width="200">
+        <img src="./doc/images/阿里云.png" alt="阿里云" height="44"><br>
+        <strong>阿里云</strong>
+      </td>
+      <td align="center" width="200">
+        <img src="./doc/images/财富云.png" alt="财富云" height="44"><br>
+        <strong>财富云</strong>
+      </td>
+      <td align="center" width="200">
+        <img src="./doc/images/火山引擎.png" alt="火山引擎" height="44"><br>
+        <strong>火山引擎</strong>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+> 本项目开源且可免费使用。
+>
+> 如果你的公司或团队也在使用 OpenClaw China，欢迎通过 Issue、PR、交流群或微信留下公司名称 / Logo / 使用场景，帮助我们持续维护项目，也让更多用户看到真实的落地案例。
+
 ## 功能支持
 
 更多功能在努力开发中~
