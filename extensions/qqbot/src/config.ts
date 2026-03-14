@@ -26,6 +26,13 @@ export const QQBotC2CMarkdownDeliveryModeSchema = z
 
 export type QQBotC2CMarkdownDeliveryMode = z.input<typeof QQBotC2CMarkdownDeliveryModeSchema>;
 
+export const QQBotC2CMarkdownChunkStrategySchema = z
+  .enum(["markdown-block", "length"])
+  .optional()
+  .default("markdown-block");
+
+export type QQBotC2CMarkdownChunkStrategy = z.input<typeof QQBotC2CMarkdownChunkStrategySchema>;
+
 // ── Account-level Schema ──────────────────────────────────────────────────────
 
 const QQBotAccountSchema = z.object({
@@ -44,6 +51,7 @@ const QQBotAccountSchema = z.object({
     .optional(),
   markdownSupport: z.boolean().optional().default(true),
   c2cMarkdownDeliveryMode: QQBotC2CMarkdownDeliveryModeSchema,
+  c2cMarkdownChunkStrategy: QQBotC2CMarkdownChunkStrategySchema,
   dmPolicy: z.enum(["open", "pairing", "allowlist"]).optional().default("open"),
   groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional().default("open"),
   requireMention: z.boolean().optional().default(true),

@@ -18,6 +18,7 @@ describe("QQBotConfigSchema", () => {
     expect(cfg.mediaTimeoutMs).toBe(30000);
     expect(cfg.markdownSupport).toBe(true);
     expect(cfg.c2cMarkdownDeliveryMode).toBe("proactive-table-only");
+    expect(cfg.c2cMarkdownChunkStrategy).toBe("markdown-block");
     expect(cfg.longTaskNoticeDelayMs).toBe(30000);
     expect(resolveQQBotAutoSendLocalPathMedia(cfg)).toBe(true);
     expect(resolveInboundMediaDir(cfg)).toBe(join(homedir(), ".openclaw", "media", "qqbot", "inbound"));
@@ -29,6 +30,7 @@ describe("QQBotConfigSchema", () => {
     expect(() => QQBotConfigSchema.parse({ mediaTimeoutMs: 0 })).toThrow();
     expect(() => QQBotConfigSchema.parse({ longTaskNoticeDelayMs: -1 })).toThrow();
     expect(() => QQBotConfigSchema.parse({ c2cMarkdownDeliveryMode: "invalid" })).toThrow();
+    expect(() => QQBotConfigSchema.parse({ c2cMarkdownChunkStrategy: "invalid" })).toThrow();
   });
 
   it("resolves custom inbound media settings", () => {
@@ -150,6 +152,26 @@ describe("QQBotConfigSchema", () => {
       "user:u-shared": "Shared Main",
       "user:u-main": "Main Alias",
     });
+  });
+
+  it("allows account-level override for markdown chunk strategy", () => {
+    const merged = mergeQQBotAccountConfig(
+      {
+        channels: {
+          qqbot: {
+            c2cMarkdownChunkStrategy: "length",
+            accounts: {
+              main: {
+                c2cMarkdownChunkStrategy: "markdown-block",
+              },
+            },
+          },
+        },
+      },
+      "main"
+    );
+
+    expect(merged.c2cMarkdownChunkStrategy).toBe("markdown-block");
   });
 
   it("normalizes runtime numeric credentials without schema parse", () => {

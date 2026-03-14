@@ -191,7 +191,9 @@ describe("QQBot C2C markdown transport", () => {
     ).toBe(true);
     expect(
       logger.info.mock.calls.some(([message]) =>
-        String(message).includes('delivery=c2c-markdown-proactive segment=1/1 chunk=1/1 phase=immediate preview=')
+        String(message).includes("delivery=c2c-markdown-proactive") &&
+        String(message).includes("segment=1/1 chunk=1/1") &&
+        String(message).includes("phase=buffered")
       )
     ).toBe(true);
   });

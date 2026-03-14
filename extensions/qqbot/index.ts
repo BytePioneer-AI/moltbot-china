@@ -57,6 +57,10 @@ const plugin = {
         type: "string",
         enum: ["passive", "proactive-table-only", "proactive-all"],
       },
+      c2cMarkdownChunkStrategy: {
+        type: "string",
+        enum: ["markdown-block", "length"],
+      },
       dmPolicy: { type: "string", enum: ["open", "pairing", "allowlist"] },
       groupPolicy: { type: "string", enum: ["open", "allowlist", "disabled"] },
       requireMention: { type: "boolean" },
@@ -105,6 +109,10 @@ const plugin = {
             c2cMarkdownDeliveryMode: {
               type: "string",
               enum: ["passive", "proactive-table-only", "proactive-all"],
+            },
+            c2cMarkdownChunkStrategy: {
+              type: "string",
+              enum: ["markdown-block", "length"],
             },
             dmPolicy: { type: "string", enum: ["open", "pairing", "allowlist"] },
             groupPolicy: { type: "string", enum: ["open", "allowlist", "disabled"] },

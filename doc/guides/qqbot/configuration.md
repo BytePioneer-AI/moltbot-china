@@ -119,12 +119,14 @@ openclaw config set channels.qqbot.clientSecret your-app-secret
 
 
 # 下面这些不需要配置，默认即可
+openclaw config set channels.qqbot.markdownSupport true
 openclaw config set channels.qqbot.dmPolicy open
 openclaw config set channels.qqbot.groupPolicy open
 openclaw config set channels.qqbot.requireMention true
 openclaw config set channels.qqbot.textChunkLimit 1500
 openclaw config set channels.qqbot.replyFinalOnly false
 openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-table-only
+openclaw config set channels.qqbot.c2cMarkdownChunkStrategy markdown-block
 openclaw config set channels.qqbot.autoSendLocalPathMedia true
 openclaw config set channels.qqbot.longTaskNoticeDelayMs 30000
 openclaw config set gateway.http.endpoints.chatCompletions.enabled true
@@ -138,7 +140,7 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 
 - 必填：`enabled`、`appId`、`clientSecret`
 - 通常保持默认即可：`dmPolicy`、`groupPolicy`、`requireMention`、`textChunkLimit`
-- 需要调交互体验时再看：`replyFinalOnly`、`c2cMarkdownDeliveryMode`、`autoSendLocalPathMedia`、`longTaskNoticeDelayMs`
+- 需要调交互体验时再看：`replyFinalOnly`、`c2cMarkdownDeliveryMode`、`c2cMarkdownChunkStrategy`、`autoSendLocalPathMedia`、`longTaskNoticeDelayMs`
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
@@ -154,6 +156,7 @@ openclaw config set gateway.http.endpoints.chatCompletions.enabled true
 | textChunkLimit | number | 1500 | 单条消息允许的最大文本长度；超出后会自动拆成多条 |
 | replyFinalOnly | boolean | false | 是否只发最终答案。`false` 时，QQ 私聊配合 `/verbose on` 会把 assistant 过渡说明和 tool 日志按真实顺序实时分条回发；`true` 时不发普通中间文本，但图片、语音这类媒体结果仍可正常发送 |
 | c2cMarkdownDeliveryMode | string | "proactive-table-only" | QQ 私聊里 Markdown 用什么方式发。默认只在“带表格”时切到更稳的方式；如果格式老是乱，可以改成 `proactive-all` |
+| c2cMarkdownChunkStrategy | string | "markdown-block" | QQ 私聊长 Markdown 的切分策略。默认优先按标题、表格、引用、分隔线、代码块等安全边界切分；如需回退旧行为可改成 `length` |
 | autoSendLocalPathMedia | boolean | true | 是否把回复里的本地图片路径自动当成图片发出去。关掉后，路径会原样保留在文本里 |
 | longTaskNoticeDelayMs | number | 30000 | 多久还没正式回复，就先补一句“我还在处理”。设为 `0` 可关闭 |
 
@@ -205,17 +208,29 @@ openclaw config set channels.qqbot.autoSendLocalPathMedia false
 
 ### 3.1 私聊 Markdown 渲染策略
 
-如果你发现 QQ 私聊里的标题、表格、引用块显示不稳定，可以调这个配置：
+如果你发现 QQ 私聊里的标题、表格、引用块显示不稳定，建议一起确认下面两个配置：
 
 ```bash
+openclaw config set channels.qqbot.markdownSupport true
 openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-all
+openclaw config set channels.qqbot.c2cMarkdownChunkStrategy markdown-block
 ```
 
-什么时候选哪个值：
+两个配置的职责不同：
 
+- `c2cMarkdownDeliveryMode`：决定私聊 Markdown 走被动发送还是主动发送
 - `passive`：尽量按普通回复方式发送。如果你很在意“回复关系”而且格式本身没问题，可以用它
 - `proactive-table-only`：默认值。平时按普通方式发，只有检测到表格时才切到更稳的方式
 - `proactive-all`：所有私聊 Markdown 都走更稳的方式发。如果你经常遇到标题、引用、分割线、表格显示不对，优先试这个
+- `c2cMarkdownChunkStrategy`：决定长 Markdown 被拆成多条时怎么切
+- `markdown-block`：默认值。会优先按标题、表格、引用、分隔线、代码块、列表和正文块这些安全边界切分；`replyFinalOnly=false` 时，还会先合并连续的结构化 Markdown，再把 tool/log 文本按原顺序单独发送
+- `length`：回退旧行为，继续按长度直接切分
+
+补充说明：
+
+- 这套安全切分只作用于 `markdownSupport=true` 的 QQ 私聊/C2C Markdown
+- 群聊、频道、非 Markdown 文本、媒体发送顺序都不受影响
+- 如果你需要对单个账号单独覆盖，也可以设置 `channels.qqbot.accounts.<accountId>.c2cMarkdownChunkStrategy`
 
 ### 3.2 私聊实时回发语义
 
@@ -223,6 +238,7 @@ openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-all
 - 你应该看到“说明 -> 日志 -> 说明 -> 日志”这类自然交错，而不是所有日志先发完、最后再补说明
 - 如果你把 `replyFinalOnly=true` 打开，普通中间文本就不发了，只保留最终答案；媒体结果不受影响
 - 这套实时回发语义当前只覆盖 QQ 私聊/C2C，群聊和频道仍保持现有行为
+- 如果当前任务卡住或你不想再等，可以在 QQ 私聊里直接发送 `停止` 或 `/stop`；这类中断命令会优先执行，并清掉同一会话里还没处理到的排队消息
 
 ### 3.3 验证 `/verbose on` 实时输出
 
@@ -238,6 +254,27 @@ openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-all
 - 你会看到说明消息和工具日志自然交错，而不是“工具日志先刷完，说明类消息最后补发”
 - 最终答复仍会单独发送，不会把前面的日志重新合并
 - `replyFinalOnly=true`：非 final 纯文本日志不会单独发送，但媒体类工具结果仍可投递
+
+### 3.4 中断当前任务
+
+如果你已经发了多个请求，但想立刻打断当前正在执行的任务，可以直接在同一个 QQ 私聊会话里发送：
+
+```text
+停止
+```
+
+或者：
+
+```text
+/stop
+```
+
+预期行为：
+
+- 这类中断命令会绕过 QQBot 本地消息队列，优先发送给 OpenClaw
+- 当前正在跑的任务会尽快中断
+- 同一会话里还没开始处理的排队消息会被直接丢弃，不会继续一个接一个执行
+- 这个影响范围只限当前会话，不会误伤其他账号或其他私聊对象
 
 ### 4. 多账户配置
 

@@ -123,12 +123,15 @@
 <details>
 <summary><strong>点击展开更新日志</strong></summary>
 
+### 2026-03-15
+- `qqbot` 新增 `停止` / `/stop` 快速通道。当前任务正在执行时，这类中断命令会绕过本地排队立即发送给 OpenClaw，并丢弃同一会话里尚未处理的排队消息，减少“停不下来还继续串消息”的情况。
+- `qqbot` 新增 `c2cMarkdownChunkStrategy`，默认 `markdown-block`。QQ 私聊 Markdown 现在会优先按标题、表格、引用、分割线、代码块和正文块这些安全边界切分；如需兼容旧的纯长度切分行为，可切回 `length`。
+
 ### 2026-03-14
 - `qqbot` 新增私聊用户显示名别名映射 `displayAliases`。首期仅对 direct 用户生效，支持 `user:<openid>`、`<openid>`、`senderId` 等键名，方便按已有联系人信息覆盖默认显示名。
 - `qqbot` 现在会优先使用 `~/.openclaw/qqbot/data/known-targets.json` 里的 `displayName` 作为私聊用户显示名；如果没有，再回退到 `displayAliases`，最后才使用稳定 ID，减少多账号和备注名场景下的识别成本。
 - `qqbot` 新增内置 `qqbot-contact-send` skill，并会随插件自动注册到新会话的 `<available_skills>`。模型可直接基于 `known-targets.json` 按联系人备注/显示名解析发送对象，并默认优先使用当前会话的 `accountId` 过滤目标，降低误发给同名联系人的风险。
 - `qqbot` 在 QQ 私聊里开启 `/verbose on` 且 `replyFinalOnly=false` 后，assistant 的普通过渡说明和工具日志现在都会实时发送，并按真实生成顺序交错出现，不会再出现“日志先刷完、说明最后补发”的时序错乱。
-- 这次修复只影响 QQ 私聊/C2C 的实时回发路径；如果你保持 `replyFinalOnly=true`，行为仍然和以前一样，只发最终文本结果，媒体结果不受影响。
 
 ### 2026-03-13
 - `qqbot` 现在能看懂 QQ 私聊里的“引用上一条消息”。用户问“这个是什么”“你刚才说的哪个文件”时，模型会一起参考被引用的那条内容来回答。
@@ -412,6 +415,7 @@ openclaw config set channels.qqbot.appId your-app-id
 openclaw config set channels.qqbot.clientSecret your-app-secret
 openclaw config set channels.qqbot.markdownSupport true
 openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-all
+openclaw config set channels.qqbot.c2cMarkdownChunkStrategy markdown-block
 openclaw config set channels.qqbot.autoSendLocalPathMedia false
 ```
 
@@ -443,12 +447,17 @@ openclaw config set channels.qqbot.autoSendLocalPathMedia false
 ```bash
 openclaw config set channels.qqbot.markdownSupport true
 openclaw config set channels.qqbot.c2cMarkdownDeliveryMode proactive-all
+openclaw config set channels.qqbot.c2cMarkdownChunkStrategy markdown-block
 ```
 
+- `c2cMarkdownDeliveryMode` 只控制私聊 Markdown 走被动发送还是主动发送：
 - `passive`：整条 C2C Markdown 回复保持被动发送
 - `proactive-table-only`：仅当回复里出现 Markdown 表格时，整条 C2C 回复改走主动发送
 - `proactive-all`：所有 C2C Markdown 回复统一改走主动发送
-- C2C 主动 Markdown transport 会尽量保留原始 Markdown，并默认整条单消息发送；只有超出长度限制时才继续分块
+- `c2cMarkdownChunkStrategy` 只控制长 Markdown 的切分方式：
+- `markdown-block`：默认值。优先按标题、表格、引用、分割线、代码块、列表和正文块这些安全边界切分；`replyFinalOnly=false` 时还会先合并连续的结构化 Markdown，再把 tool/log 文本按原顺序单独发出
+- `length`：回退旧行为，继续按长度直接切分
+- 这套安全切分只作用于 `markdownSupport=true` 的 QQ 私聊/C2C Markdown；群聊、频道和普通文本发送保持原样
 - 在 QQ 私聊启用 Markdown transport（`markdownSupport=true`）后，开启 `/verbose on` 且 `replyFinalOnly=false` 时，非 final 的工具/日志输出会即时回发，一个日志一个消息
 - 如果同时开启 `replyFinalOnly=true`，非 final 纯文本日志仍会被抑制，只保留最终回复；媒体类工具结果不受影响
 - 如果你发现“不带表格时基本正常，但带表格后标题、引用、任务列表不稳定”，优先使用 `proactive-all`；这通常是 QQ 被动回复接口本身的渲染限制

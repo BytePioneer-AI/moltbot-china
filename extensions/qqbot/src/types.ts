@@ -1,9 +1,13 @@
-import type { QQBotC2CMarkdownDeliveryMode } from "./config.js";
+import type {
+  QQBotC2CMarkdownChunkStrategy,
+  QQBotC2CMarkdownDeliveryMode,
+} from "./config.js";
 
 export type {
   QQBotConfig,
   QQBotAccountConfig,
   PluginConfig,
+  QQBotC2CMarkdownChunkStrategy,
   QQBotC2CMarkdownDeliveryMode,
 } from "./config.js";
 
@@ -14,6 +18,7 @@ export interface ResolvedQQBotAccount {
   appId?: string;
   markdownSupport?: boolean;
   c2cMarkdownDeliveryMode?: QQBotC2CMarkdownDeliveryMode;
+  c2cMarkdownChunkStrategy?: QQBotC2CMarkdownChunkStrategy;
 }
 
 export interface QQBotSendResult {

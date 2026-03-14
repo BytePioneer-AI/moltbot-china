@@ -148,6 +148,38 @@ describe("sendQQBotMediaWithFallback", () => {
       })
     );
   });
+
+  it("stops remaining media delivery when shouldContinue becomes false", async () => {
+    const sendMedia = vi
+      .fn()
+      .mockResolvedValueOnce({ channel: "qqbot", messageId: "m1", timestamp: 1 })
+      .mockResolvedValueOnce({ channel: "qqbot", messageId: "m2", timestamp: 2 });
+    const sendText = vi.fn().mockResolvedValue({ channel: "qqbot", messageId: "m3", timestamp: 3 });
+    const shouldContinue = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const logger = {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    } as unknown as Logger;
+
+    await sendQQBotMediaWithFallback({
+      qqCfg: {},
+      to: "user:bot2-user",
+      mediaQueue: ["https://example.com/first.png", "https://example.com/second.png"],
+      logger,
+      shouldContinue,
+      outbound: { sendMedia, sendText },
+    });
+
+    expect(sendMedia).toHaveBeenCalledTimes(1);
+    expect(sendMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaUrl: "https://example.com/first.png",
+      })
+    );
+    expect(sendText).not.toHaveBeenCalled();
+  });
 });
 
 describe("resolveQQBotTextReplyRefs", () => {
