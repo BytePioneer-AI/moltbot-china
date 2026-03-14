@@ -13,6 +13,7 @@
     "dev": "pnpm -r --parallel dev",
     "build:shared": "pnpm -F @openclaw-china/shared build",
     "build:dingtalk": "pnpm -F @openclaw-china/dingtalk build",
+    "build:wecom-kf": "pnpm -F @openclaw-china/wecom-kf build",
     "build:channels": "pnpm -F @openclaw-china/channels build",
     "release:all": "node scripts/release-all.mjs",
     "release:channel": "node scripts/release-all.mjs",

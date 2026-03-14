@@ -56,6 +56,12 @@
       <td><a href="doc/guides/wecom-app/configuration.md">企业微信自建应用配置指南</a></td>
     </tr>
     <tr>
+      <td>企业微信（微信客服）</td>
+      <td align="center">✅ 可用</td>
+      <td align="center">中等</td>
+      <td><a href="doc/guides/wecom-kf/configuration.md">微信客服渠道配置指南</a></td>
+    </tr>
+    <tr>
       <td>飞书（停止维护）</td>
       <td align="center">✅ 可用</td>
       <td align="center">中等</td>
@@ -252,6 +258,11 @@ openclaw china setup
 
 ```bash
 openclaw plugins install @openclaw-china/wecom
+openclaw china setup
+```
+
+```bash
+openclaw plugins install @openclaw-china/wecom-kf
 openclaw china setup
 ```
 
@@ -521,6 +532,29 @@ QQBot 插件现在也会随包自动提供 `qqbot-contact-send` skill：
 </details>
 
 <details>
+<summary><strong>企业微信（微信客服）</strong></summary>
+
+> 📖 **[微信客服渠道配置指南](doc/guides/wecom-kf/configuration.md)** — 面向外部微信用户的客服会话
+
+```bash
+openclaw config set channels.wecom-kf.enabled true
+openclaw config set channels.wecom-kf.webhookPath /wecom-kf
+openclaw config set channels.wecom-kf.token your-token
+openclaw config set channels.wecom-kf.encodingAESKey your-43-char-encoding-aes-key
+openclaw config set channels.wecom-kf.corpId your-corp-id
+openclaw config set channels.wecom-kf.corpSecret your-app-secret
+openclaw config set channels.wecom-kf.agentId 1000004
+```
+
+**注意事项**
+
+- `corpSecret` 是“可调用接口的应用” Secret。
+- `agentId` 为 `wecom-kf` 的客服账号标识配置项。
+- 根据官方限制，用户主动发消息后的 48 小时内，最多可下发 5 条消息。
+
+</details>
+
+<details>
 <summary><strong>企业微信（智能机器人）</strong></summary>
 
 > 📖 **[企业微信智能机器人配置指南](doc/guides/wecom/configuration.md)**
@@ -665,6 +699,15 @@ openclaw china setup
       "corpId": "your-corp-id",
       "corpSecret": "your-app-secret",
       "agentId": 1000002
+    },
+    "wecom-kf": {
+      "enabled": true,
+      "webhookPath": "/wecom-kf",
+      "token": "your-token",
+      "encodingAESKey": "your-43-char-encoding-aes-key",
+      "corpId": "your-corp-id",
+      "corpSecret": "your-app-secret",
+      "agentId": "1000004"
     }
   }
 }

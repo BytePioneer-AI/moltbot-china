@@ -1,0 +1,58 @@
+{
+  "id": "wecom-kf",
+  "name": "WeCom KF",
+  "description": "微信客服渠道插件",
+  "version": "0.1.0",
+  "channels": ["wecom-kf"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "name": { "type": "string" },
+      "corpId": { "type": "string" },
+      "corpSecret": { "type": "string" },
+      "agentId": { "type": "string" },
+      "apiBaseUrl": { "type": "string" },
+      "webhookPath": { "type": "string" },
+      "token": { "type": "string" },
+      "encodingAESKey": { "type": "string" },
+      "receiveId": { "type": "string" },
+      "welcomeText": { "type": "string" },
+      "dmPolicy": { "type": "string", "enum": ["open", "pairing", "allowlist", "disabled"] },
+      "allowFrom": { "type": "array", "items": { "type": "string" } },
+      "defaultAccount": { "type": "string" },
+      "accounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "enabled": { "type": "boolean" },
+            "corpId": { "type": "string" },
+            "corpSecret": { "type": "string" },
+            "agentId": { "type": "string" },
+            "apiBaseUrl": { "type": "string" },
+            "webhookPath": { "type": "string" },
+            "token": { "type": "string" },
+            "encodingAESKey": { "type": "string" },
+            "receiveId": { "type": "string" },
+            "welcomeText": { "type": "string" },
+            "dmPolicy": { "type": "string", "enum": ["open", "pairing", "allowlist", "disabled"] },
+            "allowFrom": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "corpId": { "label": "企业ID (CorpID)" },
+    "corpSecret": { "label": "应用 Secret", "sensitive": true },
+    "agentId": { "label": "客服账号ID (open_kfid, 如 wkAJ_XXXXX)" },
+    "apiBaseUrl": { "label": "企微 API 基础地址（可选代理）" },
+    "token": { "label": "回调Token", "sensitive": true },
+    "encodingAESKey": { "label": "回调EncodingAESKey", "sensitive": true },
+    "webhookPath": { "label": "Webhook Path" }
+  }
+}

@@ -53,6 +53,20 @@ import {
   getQQBotRuntime,
 } from "@openclaw-china/qqbot";
 import qqbotEntry from "@openclaw-china/qqbot";
+import {
+  wecomKhPlugin,
+  DEFAULT_ACCOUNT_ID as WECOM_KH_DEFAULT_ACCOUNT_ID,
+  setWecomKhRuntime,
+  getWecomKhRuntime,
+} from "@openclaw-china/wecom-kh";
+import wecomKhEntry from "@openclaw-china/wecom-kh";
+import {
+  wecomKfPlugin,
+  DEFAULT_ACCOUNT_ID as WECOM_KF_DEFAULT_ACCOUNT_ID,
+  setWecomKfRuntime,
+  getWecomKfRuntime,
+} from "@openclaw-china/wecom-kf";
+import wecomKfEntry from "@openclaw-china/wecom-kf";
 import { registerChinaSetupCli, showChinaInstallHint } from "@openclaw-china/shared";
 
 export {
@@ -84,8 +98,15 @@ export {
   sendWecomAppImageMessage,
   qqbotPlugin,
   QQBOT_DEFAULT_ACCOUNT_ID,
-  setQQBotRuntime,
   getQQBotRuntime,
+  wecomKhPlugin,
+  WECOM_KH_DEFAULT_ACCOUNT_ID,
+  setWecomKhRuntime,
+  getWecomKhRuntime,
+  wecomKfPlugin,
+  WECOM_KF_DEFAULT_ACCOUNT_ID,
+  setWecomKfRuntime,
+  getWecomKfRuntime,
 };
 
 export type {
@@ -108,6 +129,8 @@ export type {
   AccessTokenCacheEntry,
 } from "@openclaw-china/wecom-app";
 export type { QQBotConfig, ResolvedQQBotAccount, QQBotSendResult } from "@openclaw-china/qqbot";
+export type { WecomKhConfig, ResolvedWecomKhAccount, WecomKhInboundMessage } from "@openclaw-china/wecom-kh";
+export type { WecomKfConfig, ResolvedWecomKfAccount, WecomKfInboundMessage } from "@openclaw-china/wecom-kf";
 
 // TODO: 后续添加其他渠道
 // export { qqPlugin } from "@openclaw-china/qq";
@@ -141,6 +164,26 @@ export interface WecomAppRouteConfig extends ChannelConfig {
   >;
 }
 
+export interface WecomKhRouteConfig extends ChannelConfig {
+  webhookPath?: string;
+  accounts?: Record<
+    string,
+    {
+      webhookPath?: string;
+    }
+  >;
+}
+
+export interface WecomKfRouteConfig extends ChannelConfig {
+  webhookPath?: string;
+  accounts?: Record<
+    string,
+    {
+      webhookPath?: string;
+    }
+  >;
+}
+
 /**
  * Moltbot 配置接口（符合官方约定）
  * 配置路径: channels.<id>.enabled
@@ -151,6 +194,8 @@ export interface MoltbotConfig {
     "feishu-china"?: ChannelConfig;
     wecom?: WecomRouteConfig;
     "wecom-app"?: WecomAppRouteConfig;
+    "wecom-kh"?: WecomKhRouteConfig;
+    "wecom-kf"?: WecomKfRouteConfig;
     qqbot?: ChannelConfig;
     qq?: ChannelConfig;
     [key: string]: ChannelConfig | undefined;
@@ -184,7 +229,7 @@ export interface MoltbotPluginApi {
 /**
  * 支持的渠道列表
  */
-export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-app", "qqbot"] as const;
+export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kh", "wecom-kf", "qqbot"] as const;
 // TODO: 鍚庣画娣诲姞 "qq"
 
 export type SupportedChannel = (typeof SUPPORTED_CHANNELS)[number];
@@ -208,6 +253,16 @@ const channelPlugins: Record<SupportedChannel, { register: (api: MoltbotPluginAp
   "wecom-app": {
     register: (api: MoltbotPluginApi) => {
       wecomAppEntry.register(api);
+    },
+  },
+  "wecom-kh": {
+    register: (api: MoltbotPluginApi) => {
+      wecomKhEntry.register(api);
+    },
+  },
+  "wecom-kf": {
+    register: (api: MoltbotPluginApi) => {
+      wecomKfEntry.register(api);
     },
   },
   qqbot: {
@@ -274,7 +329,7 @@ export function registerChannelsByConfig(
 const channelsPlugin = {
   id: "channels",
   name: "Moltbot China Channels",
-  description: "统一渠道包，支持钉钉、飞书、企业微信、QQ Bot",
+  description: "统一渠道包，支持钉钉、飞书、企业微信、企业微信客服、QQ Bot",
 
   configSchema: {
     type: "object",

@@ -1,0 +1,117 @@
+{
+  "name": "@openclaw-china/wecom-kf",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenClaw WeCom KF (微信客服) channel plugin",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "openclaw.plugin.json"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wecom-kf",
+      "label": "WeCom KF",
+      "selectionLabel": "WeCom KF (微信客服)",
+      "docsPath": "/channels/wecom-kf",
+      "blurb": "微信客服渠道，支持外部微信用户聊天",
+      "aliases": [
+        "qywx-kf",
+        "wecom-kf",
+        "微信客服"
+      ],
+      "order": 85
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wecom-kf",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  },
+  "moltbot": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wecom-kf",
+      "label": "WeCom KF",
+      "selectionLabel": "WeCom KF (微信客服)",
+      "docsPath": "/channels/wecom-kf",
+      "blurb": "微信客服渠道，支持外部微信用户聊天",
+      "aliases": [
+        "qywx-kf",
+        "wecom-kf",
+        "微信客服"
+      ],
+      "order": 85
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wecom-kf",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  },
+  "clawdbot": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wecom-kf",
+      "label": "WeCom KF",
+      "selectionLabel": "WeCom KF (微信客服)",
+      "docsPath": "/channels/wecom-kf",
+      "blurb": "微信客服渠道，支持外部微信用户聊天",
+      "aliases": [
+        "qywx-kf",
+        "wecom-kf",
+        "微信客服"
+      ],
+      "order": 85
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wecom-kf",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "release": "npm run build && npm publish",
+    "release:patch": "npm run build && npm version patch && npm publish",
+    "release:minor": "npm run build && npm version minor && npm publish",
+    "release:major": "npm run build && npm version major && npm publish"
+  },
+  "dependencies": {
+    "@openclaw-china/shared": "2026.3.9-1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.2.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "moltbot": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "moltbot": {
+      "optional": true
+    }
+  },
+  "private": false
+}

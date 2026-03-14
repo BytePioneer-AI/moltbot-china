@@ -124,7 +124,7 @@
       "encodingAESKey": "your-43-char-encoding-aes-key",
       "corpId": "your-corp-id",
       "corpSecret": "your-app-secret",
-      "openKfId": "your-open-kfid"
+      "agentId": "wkAJ_XXXXX"
     }
   }
 }
@@ -135,7 +135,7 @@
 - `corpId` / `corpSecret` 用于获取 `access_token`
 - `token` / `encodingAESKey` 用于回调签名与解密
 - `webhookPath` 用于接收企业微信回调
-- `openKfId` 用于默认发送的客服账号标识
+- `agentId` 即客服账号 ID（`open_kfid`），格式如 `wkAJ_XXXXX`
 
 ## 8. 建议的开发落地顺序
 
