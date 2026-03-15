@@ -61,7 +61,6 @@
     "@openclaw-china/shared": "workspace:*",
     "@openclaw-china/wecom": "2026.3.9-1",
     "@openclaw-china/wecom-app": "2026.3.9-1",
-    "@openclaw-china/wecom-kh": "workspace:*",
     "@openclaw-china/wecom-kf": "workspace:*"
   },
   "devDependencies": {

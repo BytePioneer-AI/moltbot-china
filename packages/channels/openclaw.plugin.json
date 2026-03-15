@@ -3,7 +3,7 @@
   "name": "Moltbot China Channels",
   "description": "统一渠道包，支持钉钉、飞书、企业微信智能机器人、企业微信自建应用、微信客服、QQ Bot",
   "version": "0.1.0",
-  "channels": ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kh", "wecom-kf", "qqbot"],
+  "channels": ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "qqbot"],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
