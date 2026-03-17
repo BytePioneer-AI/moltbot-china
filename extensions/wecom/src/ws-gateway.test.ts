@@ -9,7 +9,13 @@ import { WebSocketServer } from "ws";
 
 vi.mock("@wecom/aibot-node-sdk", async () => await import("./test-sdk-mock.js"));
 
-import { resolveWecomAccount, type PluginConfig } from "./config.js";
+import {
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS,
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS,
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS,
+  resolveWecomAccount,
+  type PluginConfig,
+} from "./config.js";
 import { clearWecomRuntime, setWecomRuntime } from "./runtime.js";
 import {
   sendWecomWsProactiveMarkdown,
@@ -449,6 +455,117 @@ describe("wecom ws gateway", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(received.filter((frame) => frame.cmd === "aibot_respond_msg")).toHaveLength(0);
+
+    controller.abort();
+    await expect(gatewayPromise).resolves.toBeUndefined();
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  });
+
+  it("forces block streaming and injects tuned coalesce defaults into dispatch", async () => {
+    const server = new WebSocketServer({ port: 0 });
+    await once(server, "listening");
+
+    const received: WecomWsFrame[] = [];
+    server.on("connection", (socket) => {
+      socket.on("message", (raw) => {
+        const frame = JSON.parse(raw.toString()) as WecomWsFrame;
+        received.push(frame);
+        if (frame.cmd === "aibot_msg_callback" || frame.cmd === "aibot_event_callback") {
+          return;
+        }
+        socket.send(
+          JSON.stringify({
+            cmd: frame.cmd,
+            headers: {
+              req_id: frame.headers?.req_id,
+            },
+            errcode: 0,
+          }),
+        );
+      });
+    });
+
+    const { port } = server.address() as AddressInfo;
+    const cfg: PluginConfig = {
+      channels: {
+        wecom: {
+          mode: "ws",
+          dmPolicy: "open",
+          botId: "bot-1",
+          secret: "secret-1",
+          wsUrl: `ws://127.0.0.1:${port}`,
+          heartbeatIntervalMs: 20,
+          reconnectInitialDelayMs: 10,
+          reconnectMaxDelayMs: 40,
+        },
+      },
+    };
+    const account = resolveWecomAccount({ cfg, accountId: "default" });
+    let capturedCfg: PluginConfig | undefined;
+    let capturedReplyOptions: { disableBlockStreaming?: boolean } | undefined;
+
+    setWecomRuntime({
+      channel: {
+        routing: {
+          resolveAgentRoute: () => ({
+            sessionKey: "session-1",
+            accountId: account.accountId,
+          }),
+        },
+        reply: {
+          dispatchReplyWithBufferedBlockDispatcher: async (params) => {
+            capturedCfg = params.cfg as PluginConfig;
+            capturedReplyOptions = params.replyOptions as { disableBlockStreaming?: boolean } | undefined;
+          },
+        },
+      },
+    });
+
+    const controller = new AbortController();
+    const gatewayPromise = startWecomWsGateway({
+      cfg,
+      account,
+      abortSignal: controller.signal,
+      runtime: {
+        log: () => {},
+        error: () => {},
+      },
+    });
+
+    await waitFor(() => received.some((frame) => frame.cmd === "aibot_subscribe"));
+
+    const client = [...server.clients][0];
+    client?.send(
+      JSON.stringify({
+        cmd: "aibot_msg_callback",
+        headers: {
+          req_id: "req-streaming-defaults-1",
+        },
+        body: {
+          msgid: "msg-streaming-defaults-1",
+          chattype: "single",
+          from: { userid: "user-1" },
+          msgtype: "text",
+          text: { content: "hello" },
+        },
+      }),
+    );
+
+    await waitFor(() => Boolean(capturedCfg));
+
+    expect(capturedReplyOptions?.disableBlockStreaming).toBe(false);
+    expect(capturedCfg?.channels?.wecom?.blockStreaming).toBe(true);
+    expect(capturedCfg?.channels?.wecom?.blockStreamingCoalesce).toEqual({
+      minChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS,
+      maxChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS,
+      idleMs: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS,
+    });
 
     controller.abort();
     await expect(gatewayPromise).resolves.toBeUndefined();

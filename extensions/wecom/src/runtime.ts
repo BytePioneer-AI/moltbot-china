@@ -28,6 +28,10 @@ export interface PluginRuntime {
           deliver: (payload: { text?: string; mediaUrl?: string; mediaUrls?: string[] }) => Promise<void>;
           onError?: (err: unknown, info: { kind: string }) => void;
         };
+        replyOptions?: {
+          disableBlockStreaming?: boolean;
+          [key: string]: unknown;
+        };
       }) => Promise<void>;
       finalizeInboundContext?: (ctx: unknown) => unknown;
       createReplyDispatcher?: (params: unknown) => unknown;

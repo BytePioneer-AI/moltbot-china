@@ -2,6 +2,13 @@ export type WecomDmPolicy = "open" | "pairing" | "allowlist" | "disabled";
 export type WecomGroupPolicy = "open" | "allowlist" | "disabled";
 export type WecomTransportMode = "webhook" | "ws";
 export type WecomWsImageReplyMode = "native" | "markdown-url";
+export type WecomChunkMode = "length" | "newline";
+
+export type WecomBlockStreamingCoalesceConfig = {
+  minChars?: number;
+  maxChars?: number;
+  idleMs?: number;
+};
 
 export type WecomAccountConfig = {
   name?: string;
@@ -29,6 +36,10 @@ export type WecomAccountConfig = {
   groupPolicy?: WecomGroupPolicy;
   groupAllowFrom?: string[];
   requireMention?: boolean;
+  textChunkLimit?: number;
+  chunkMode?: WecomChunkMode;
+  blockStreaming?: boolean;
+  blockStreamingCoalesce?: WecomBlockStreamingCoalesceConfig;
 };
 
 export type WecomConfig = WecomAccountConfig & {

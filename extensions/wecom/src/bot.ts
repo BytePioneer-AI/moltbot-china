@@ -22,7 +22,9 @@ import * as os from "os";
 import * as fsPromises from "fs/promises";
 import * as fs from "fs";
 import {
+  buildWecomDispatchConfig,
   resolveAllowFrom,
+  resolveWecomBlockStreamingEnabled,
   resolveGroupAllowFrom,
   resolveGroupPolicy,
   resolveRequireMention,
@@ -602,10 +604,11 @@ export async function dispatchWecomMessage(params: {
     const tableMode = channel.text?.resolveMarkdownTableMode
       ? channel.text.resolveMarkdownTableMode({ cfg: safeCfg, channel: "wecom", accountId: account.accountId })
       : undefined;
+    const dispatchCfg = buildWecomDispatchConfig({ cfg: safeCfg, accountId: account.accountId });
 
     await channel.reply.dispatchReplyWithBufferedBlockDispatcher({
       ctx: ctxPayload,
-      cfg: safeCfg,
+      cfg: dispatchCfg,
       dispatcherOptions: {
         deliver: async (payload: { text?: string; mediaUrl?: string; mediaUrls?: string[] }) => {
           const rawText = payload.text ?? "";
@@ -655,6 +658,9 @@ export async function dispatchWecomMessage(params: {
           hooks.onError?.(err);
           logger.error(`${info.kind} reply failed: ${String(err)}`);
         },
+      },
+      replyOptions: {
+        disableBlockStreaming: !resolveWecomBlockStreamingEnabled(account.config),
       },
     });
   } finally {

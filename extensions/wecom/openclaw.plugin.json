@@ -30,6 +30,18 @@
       "groupPolicy": { "type": "string", "enum": ["open", "allowlist", "disabled"] },
       "groupAllowFrom": { "type": "array", "items": { "type": "string" } },
       "requireMention": { "type": "boolean" },
+      "textChunkLimit": { "type": "integer", "minimum": 1 },
+      "chunkMode": { "type": "string", "enum": ["length", "newline"] },
+      "blockStreaming": { "type": "boolean" },
+      "blockStreamingCoalesce": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minChars": { "type": "integer", "minimum": 1 },
+          "maxChars": { "type": "integer", "minimum": 1 },
+          "idleMs": { "type": "integer", "minimum": 0 }
+        }
+      },
       "defaultAccount": { "type": "string" },
       "accounts": {
         "type": "object",
@@ -57,7 +69,19 @@
             "allowFrom": { "type": "array", "items": { "type": "string" } },
             "groupPolicy": { "type": "string", "enum": ["open", "allowlist", "disabled"] },
             "groupAllowFrom": { "type": "array", "items": { "type": "string" } },
-            "requireMention": { "type": "boolean" }
+            "requireMention": { "type": "boolean" },
+            "textChunkLimit": { "type": "integer", "minimum": 1 },
+            "chunkMode": { "type": "string", "enum": ["length", "newline"] },
+            "blockStreaming": { "type": "boolean" },
+            "blockStreamingCoalesce": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "minChars": { "type": "integer", "minimum": 1 },
+                "maxChars": { "type": "integer", "minimum": 1 },
+                "idleMs": { "type": "integer", "minimum": 0 }
+              }
+            }
           }
         }
       }

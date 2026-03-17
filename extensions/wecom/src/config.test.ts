@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildWecomDispatchConfig,
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS,
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS,
+  DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS,
+  DEFAULT_WECOM_TEXT_CHUNK_LIMIT,
   DEFAULT_WECOM_WS_HEARTBEAT_MS,
   DEFAULT_WECOM_WS_RECONNECT_INITIAL_MS,
   DEFAULT_WECOM_WS_RECONNECT_MAX_MS,
@@ -85,5 +90,58 @@ describe("resolveWecomAccount", () => {
     });
 
     expect(account.wsImageReplyMode).toBe("markdown-url");
+  });
+
+  it("injects aggressive streaming defaults into dispatch config", () => {
+    const dispatchCfg = buildWecomDispatchConfig({
+      cfg: {
+        channels: {
+          wecom: {
+            botId: "bot-123",
+            secret: "secret-xyz",
+          },
+        },
+      },
+      accountId: "default",
+    });
+
+    expect(dispatchCfg.channels?.wecom?.textChunkLimit).toBe(DEFAULT_WECOM_TEXT_CHUNK_LIMIT);
+    expect(dispatchCfg.channels?.wecom?.blockStreaming).toBe(true);
+    expect(dispatchCfg.channels?.wecom?.blockStreamingCoalesce).toEqual({
+      minChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS,
+      maxChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS,
+      idleMs: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS,
+    });
+  });
+
+  it("deep merges account-level coalesce overrides for dispatch config", () => {
+    const dispatchCfg = buildWecomDispatchConfig({
+      cfg: {
+        channels: {
+          wecom: {
+            blockStreamingCoalesce: {
+              minChars: 160,
+              maxChars: 280,
+            },
+            accounts: {
+              zhugeliang: {
+                botId: "bot-123",
+                secret: "secret-xyz",
+                blockStreamingCoalesce: {
+                  idleMs: 120,
+                },
+              },
+            },
+          },
+        },
+      },
+      accountId: "zhugeliang",
+    });
+
+    expect(dispatchCfg.channels?.wecom?.accounts?.zhugeliang?.blockStreamingCoalesce).toEqual({
+      minChars: 160,
+      maxChars: 280,
+      idleMs: 120,
+    });
   });
 });

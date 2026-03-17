@@ -8,6 +8,7 @@ import { resolveFileCategory } from "@openclaw-china/shared";
 
 import type { ResolvedWecomAccount, WecomConfig } from "./types.js";
 import {
+  DEFAULT_WECOM_TEXT_CHUNK_LIMIT,
   DEFAULT_ACCOUNT_ID,
   listWecomAccountIds,
   resolveDefaultWecomAccountId,
@@ -262,6 +263,7 @@ export const wecomPlugin = {
   capabilities: {
     chatTypes: ["direct", "group"] as const,
     media: true,
+    blockStreaming: true,
     reactions: false,
     threads: false,
     edit: false,
@@ -438,6 +440,7 @@ export const wecomPlugin = {
 
   outbound: {
     deliveryMode: "direct",
+    textChunkLimit: DEFAULT_WECOM_TEXT_CHUNK_LIMIT,
 
     sendText: async (params: {
       cfg: PluginConfig;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type {
   ResolvedWecomAccount,
   WecomAccountConfig,
+  WecomBlockStreamingCoalesceConfig,
   WecomConfig,
   WecomDmPolicy,
   WecomGroupPolicy,
@@ -17,6 +18,17 @@ export const DEFAULT_WECOM_WS_URL = "wss://openws.work.weixin.qq.com";
 export const DEFAULT_WECOM_WS_HEARTBEAT_MS = 30_000;
 export const DEFAULT_WECOM_WS_RECONNECT_INITIAL_MS = 1_000;
 export const DEFAULT_WECOM_WS_RECONNECT_MAX_MS = 30_000;
+export const DEFAULT_WECOM_TEXT_CHUNK_LIMIT = 4_000;
+export const DEFAULT_WECOM_BLOCK_STREAMING = true;
+export const DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS = 120;
+export const DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS = 320;
+export const DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS = 250;
+
+const WecomBlockStreamingCoalesceSchema = z.object({
+  minChars: z.number().int().positive().optional(),
+  maxChars: z.number().int().positive().optional(),
+  idleMs: z.number().int().min(0).optional(),
+});
 
 const WecomAccountSchema = z.object({
   name: z.string().optional(),
@@ -40,6 +52,10 @@ const WecomAccountSchema = z.object({
   groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
   groupAllowFrom: z.array(z.string()).optional(),
   requireMention: z.boolean().optional(),
+  textChunkLimit: z.number().int().positive().optional(),
+  chunkMode: z.enum(["length", "newline"]).optional(),
+  blockStreaming: z.boolean().optional(),
+  blockStreamingCoalesce: WecomBlockStreamingCoalesceSchema.optional(),
 });
 
 export const WecomConfigSchema = WecomAccountSchema.extend({
@@ -75,6 +91,18 @@ export const WecomConfigJsonSchema = {
       groupPolicy: { type: "string", enum: ["open", "allowlist", "disabled"] },
       groupAllowFrom: { type: "array", items: { type: "string" } },
       requireMention: { type: "boolean" },
+      textChunkLimit: { type: "integer", minimum: 1 },
+      chunkMode: { type: "string", enum: ["length", "newline"] },
+      blockStreaming: { type: "boolean" },
+      blockStreamingCoalesce: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          minChars: { type: "integer", minimum: 1 },
+          maxChars: { type: "integer", minimum: 1 },
+          idleMs: { type: "integer", minimum: 0 },
+        },
+      },
       defaultAccount: { type: "string" },
       accounts: {
         type: "object",
@@ -102,7 +130,19 @@ export const WecomConfigJsonSchema = {
             allowFrom: { type: "array", items: { type: "string" } },
             groupPolicy: { type: "string", enum: ["open", "allowlist", "disabled"] },
             groupAllowFrom: { type: "array", items: { type: "string" } },
-            requireMention: { type: "boolean" }
+            requireMention: { type: "boolean" },
+            textChunkLimit: { type: "integer", minimum: 1 },
+            chunkMode: { type: "string", enum: ["length", "newline"] },
+            blockStreaming: { type: "boolean" },
+            blockStreamingCoalesce: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                minChars: { type: "integer", minimum: 1 },
+                maxChars: { type: "integer", minimum: 1 },
+                idleMs: { type: "integer", minimum: 0 },
+              }
+            }
           }
         }
       }
@@ -128,6 +168,26 @@ export function parseWecomConfig(raw: unknown): WecomConfig | undefined {
 export function normalizeAccountId(raw?: string | null): string {
   const trimmed = String(raw ?? "").trim();
   return trimmed || DEFAULT_ACCOUNT_ID;
+}
+
+function mergeWecomBlockStreamingCoalesce(
+  base?: WecomBlockStreamingCoalesceConfig,
+  override?: WecomBlockStreamingCoalesceConfig,
+): WecomBlockStreamingCoalesceConfig | undefined {
+  if (!base && !override) return undefined;
+  return {
+    minChars: override?.minChars ?? base?.minChars,
+    maxChars: override?.maxChars ?? base?.maxChars,
+    idleMs: override?.idleMs ?? base?.idleMs,
+  };
+}
+
+function resolveWecomBlockStreamingCoalesceDefaults(): WecomBlockStreamingCoalesceConfig {
+  return {
+    minChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MIN_CHARS,
+    maxChars: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_MAX_CHARS,
+    idleMs: DEFAULT_WECOM_BLOCK_STREAM_COALESCE_IDLE_MS,
+  };
 }
 
 function normalizeMode(raw?: string | null): WecomTransportMode {
@@ -168,7 +228,60 @@ function mergeWecomAccountConfig(cfg: PluginConfig, accountId: string): WecomAcc
   const base = (cfg.channels?.wecom ?? {}) as WecomConfig;
   const { accounts: _ignored, defaultAccount: _ignored2, ...baseConfig } = base;
   const account = resolveAccountConfig(cfg, accountId) ?? {};
-  return { ...baseConfig, ...account };
+  return {
+    ...baseConfig,
+    ...account,
+    blockStreamingCoalesce: mergeWecomBlockStreamingCoalesce(
+      baseConfig.blockStreamingCoalesce,
+      account.blockStreamingCoalesce,
+    ),
+  };
+}
+
+export function resolveWecomBlockStreamingEnabled(config: WecomAccountConfig): boolean {
+  return config.blockStreaming ?? DEFAULT_WECOM_BLOCK_STREAMING;
+}
+
+export function buildWecomDispatchConfig(params: {
+  cfg: PluginConfig;
+  accountId?: string | null;
+}): PluginConfig {
+  const currentCfg = params.cfg ?? {};
+  const wecom = (currentCfg.channels?.wecom ?? {}) as WecomConfig;
+  const accountId = normalizeAccountId(params.accountId);
+  const topLevelCoalesce = mergeWecomBlockStreamingCoalesce(
+    resolveWecomBlockStreamingCoalesceDefaults(),
+    wecom.blockStreamingCoalesce,
+  );
+
+  const nextWecom: WecomConfig = {
+    ...wecom,
+    textChunkLimit: wecom.textChunkLimit ?? DEFAULT_WECOM_TEXT_CHUNK_LIMIT,
+    blockStreaming: wecom.blockStreaming ?? DEFAULT_WECOM_BLOCK_STREAMING,
+    blockStreamingCoalesce: topLevelCoalesce,
+  };
+
+  const account = wecom.accounts?.[accountId];
+  if (account) {
+    nextWecom.accounts = {
+      ...(wecom.accounts ?? {}),
+      [accountId]: {
+        ...account,
+        blockStreamingCoalesce: mergeWecomBlockStreamingCoalesce(
+          topLevelCoalesce,
+          account.blockStreamingCoalesce,
+        ),
+      },
+    };
+  }
+
+  return {
+    ...currentCfg,
+    channels: {
+      ...(currentCfg.channels ?? {}),
+      wecom: nextWecom,
+    },
+  };
 }
 
 export function resolveWecomAccount(params: { cfg: PluginConfig; accountId?: string | null }): ResolvedWecomAccount {

@@ -124,6 +124,33 @@ openclaw config set channels.wecom.secret your-secret
 - `heartbeatIntervalMs`: 心跳间隔，默认 30000
 - `reconnectInitialDelayMs`: 首次重连延迟，默认 1000
 - `reconnectMaxDelayMs`: 最大重连延迟，默认 30000
+- `blockStreaming`: 是否启用分块流式回复，默认 `true`
+- `textChunkLimit`: 单次文本块上限，默认 `4000`
+- `blockStreamingCoalesce.minChars`: 达到多少字符后优先刷新，默认 `120`
+- `blockStreamingCoalesce.maxChars`: 单块聚合上限，默认 `320`
+- `blockStreamingCoalesce.idleMs`: 空闲多久强制刷新，默认 `250`
+- `chunkMode`: 默认 `length`；设为 `newline` 时会在段落边界更积极地刷新
+
+如果你希望企业微信更像“实时打字”而不是最后一大块一起出来，推荐这组配置：
+
+```bash
+openclaw config set channels.wecom.blockStreaming true
+openclaw config set channels.wecom.blockStreamingCoalesce.minChars 120
+openclaw config set channels.wecom.blockStreamingCoalesce.maxChars 240
+openclaw config set channels.wecom.blockStreamingCoalesce.idleMs 180
+```
+
+如果你的回复经常自然分段，还可以再打开按换行刷新的模式：
+
+```bash
+openclaw config set channels.wecom.chunkMode newline
+```
+
+说明：
+
+- `length` 更稳，更新频率适中，适合作为默认值
+- `newline` 更激进，只要模型开始换段就会更快推到企微
+- 刷新太频繁会增加企微更新次数，不建议把 `idleMs` 压到 `100` 以下
 
 ## 四、启动并验证
 
@@ -138,4 +165,3 @@ openclaw gateway --port 18789 --verbose
 ```bash
 openclaw daemon start
 ```
-
