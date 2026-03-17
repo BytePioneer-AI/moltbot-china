@@ -56,6 +56,12 @@ export class WSClient extends EventEmitter {
   }
 
   connect(): this {
+    this.clearHeartbeat();
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.terminate();
+      this.socket = null;
+    }
     this.socket = new WebSocket(this.wsUrl);
 
     this.socket.on("open", () => {

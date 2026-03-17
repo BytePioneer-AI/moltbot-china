@@ -40,6 +40,7 @@ const activeConnections = new Map<string, ActiveConnection>();
 const processedMessageIds = new Map<string, number>();
 const PROCESSED_MESSAGE_TTL_MS = 10 * 60 * 1000;
 const WECOM_WS_SHUTDOWN_GRACE_MS = 1_000;
+const WECOM_WS_EVENT_RECONNECT_COOLDOWN_MS = 5_000;
 const activatedTargets = new Map<
   string,
   {
@@ -325,6 +326,8 @@ export async function startWecomWsGateway(opts: StartWecomWsGatewayOptions): Pro
     let finished = false;
     let shuttingDown = false;
     let shutdownTimer: NodeJS.Timeout | null = null;
+    let eventReconnectTimer: NodeJS.Timeout | null = null;
+    let lastEventReconnectAt = 0;
 
     const client = new WSClient({
       botId: account.botId ?? "",
@@ -343,6 +346,10 @@ export async function startWecomWsGateway(opts: StartWecomWsGatewayOptions): Pro
       if (shutdownTimer) {
         clearTimeout(shutdownTimer);
         shutdownTimer = null;
+      }
+      if (eventReconnectTimer) {
+        clearTimeout(eventReconnectTimer);
+        eventReconnectTimer = null;
       }
       abortSignal?.removeEventListener("abort", onAbort);
       client.removeAllListeners();
@@ -387,6 +394,49 @@ export async function startWecomWsGateway(opts: StartWecomWsGatewayOptions): Pro
     const onAbort = () => {
       logger.info("abort signal received, stopping wecom ws gateway");
       beginShutdown();
+    };
+
+    const scheduleEventReconnect = (reason: string) => {
+      if (finished || shuttingDown) return;
+      const now = Date.now();
+      if (eventReconnectTimer) {
+        logger.debug(`wecom ws reconnect already scheduled for account ${account.accountId}`);
+        return;
+      }
+      if (now - lastEventReconnectAt < WECOM_WS_EVENT_RECONNECT_COOLDOWN_MS) {
+        logger.warn(
+          `wecom ws reconnect for account ${account.accountId} suppressed by cooldown (${reason})`
+        );
+        return;
+      }
+      lastEventReconnectAt = now;
+      setStatus?.({
+        accountId: account.accountId,
+        mode: "ws",
+        running: true,
+        connectionState: "reconnecting",
+        lastDisconnectAt: now,
+        lastDisconnectReason: reason,
+      });
+      eventReconnectTimer = setTimeout(() => {
+        eventReconnectTimer = null;
+        if (finished || shuttingDown) return;
+        logger.warn(`forcing wecom ws reconnect for account ${account.accountId} (${reason})`);
+        try {
+          client.connect();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.error(`wecom ws forced reconnect failed: ${message}`);
+          setStatus?.({
+            accountId: account.accountId,
+            mode: "ws",
+            connectionState: "disconnected",
+            lastErrorAt: Date.now(),
+            lastError: message,
+          });
+        }
+      }, 0);
+      eventReconnectTimer.unref?.();
     };
 
     const handleMessageCallback = (frame: SdkWsFrame) => {
@@ -513,6 +563,7 @@ export async function startWecomWsGateway(opts: StartWecomWsGatewayOptions): Pro
           lastDisconnectAt: Date.now(),
           lastDisconnectReason: "disconnected_event",
         });
+        scheduleEventReconnect("disconnected_event");
         return;
       }
 

@@ -2,7 +2,7 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 
 vi.mock("@wecom/aibot-node-sdk", async () => await import("./test-sdk-mock.js"));
 
@@ -130,6 +130,102 @@ describe("wecom ws gateway", () => {
     controller.abort();
     await expect(gatewayPromise).resolves.toBeUndefined();
     expect(statuses.some((status) => status.running === false)).toBe(true);
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  });
+
+  it("forces a reconnect when the server emits disconnected_event", async () => {
+    const server = new WebSocketServer({ port: 0 });
+    await once(server, "listening");
+
+    const received: WecomWsFrame[] = [];
+    let latestSocket: WebSocket | null = null;
+    server.on("connection", (socket) => {
+      latestSocket = socket;
+      socket.on("message", (raw) => {
+        const frame = JSON.parse(raw.toString()) as WecomWsFrame;
+        received.push(frame);
+        if (frame.cmd === "aibot_msg_callback" || frame.cmd === "aibot_event_callback") {
+          return;
+        }
+        socket.send(
+          JSON.stringify({
+            cmd: frame.cmd,
+            headers: {
+              req_id: frame.headers?.req_id,
+            },
+            errcode: 0,
+          })
+        );
+      });
+    });
+
+    const { port } = server.address() as AddressInfo;
+    const cfg: PluginConfig = {
+      channels: {
+        wecom: {
+          mode: "ws",
+          botId: "bot-1",
+          secret: "secret-1",
+          wsUrl: `ws://127.0.0.1:${port}`,
+          heartbeatIntervalMs: 20,
+          reconnectInitialDelayMs: 10,
+          reconnectMaxDelayMs: 40,
+        },
+      },
+    };
+    const account = resolveWecomAccount({ cfg, accountId: "default" });
+    const statuses: Array<Record<string, unknown>> = [];
+    const controller = new AbortController();
+
+    const gatewayPromise = startWecomWsGateway({
+      cfg,
+      account,
+      abortSignal: controller.signal,
+      runtime: {
+        log: () => {},
+        error: () => {},
+      },
+      setStatus: (status) => {
+        statuses.push(status);
+      },
+    });
+
+    await waitFor(
+      () =>
+        received.filter((frame) => frame.cmd === "aibot_subscribe").length >= 1 &&
+        statuses.some((status) => status.connectionState === "ready")
+    );
+
+    latestSocket?.send(
+      JSON.stringify({
+        cmd: "aibot_event_callback",
+        headers: {
+          req_id: "req-disconnected-1",
+        },
+        body: {
+          msgid: "event-disconnected-1",
+          chattype: "single",
+          from: { userid: "user-1" },
+          msgtype: "event",
+          event: {
+            eventtype: "disconnected_event",
+          },
+        },
+      })
+    );
+
+    await waitFor(() => received.filter((frame) => frame.cmd === "aibot_subscribe").length >= 2);
+    expect(statuses.some((status) => status.lastDisconnectReason === "disconnected_event")).toBe(true);
+    expect(statuses.filter((status) => status.connectionState === "ready").length).toBeGreaterThanOrEqual(2);
+
+    controller.abort();
+    await expect(gatewayPromise).resolves.toBeUndefined();
 
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {
