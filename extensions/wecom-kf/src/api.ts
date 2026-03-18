@@ -480,17 +480,8 @@ export async function downloadAndSendKfImage(
   imageUrl: string,
 ): Promise<SendMessageResult> {
   try {
-    const resp = await fetch(imageUrl);
-    if (!resp.ok) {
-      return { ok: false, errcode: -1, errmsg: `Download image failed: HTTP ${resp.status}` };
-    }
-    const arrayBuffer = await resp.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const urlPath = imageUrl.split("?")[0] ?? "";
-    const ext = urlPath.split(".").pop() ?? "jpg";
-    const filename = `image_${Date.now()}.${ext}`;
-
+    const { buffer, contentType } = await downloadFile(imageUrl);
+    const filename = resolveFilename(imageUrl, "image.jpg", ".jpg");
     const mediaId = await uploadMedia(account, buffer, filename, "image");
     return await sendKfImageMessage(account, target, mediaId);
   } catch (err) {
@@ -1122,7 +1113,16 @@ export async function downloadFile(fileUrl: string): Promise<{ buffer: Buffer; c
       contentType: resp.headers.get('content-type') || undefined,
     };
   } else {
-    const buffer = await readFile(fileUrl);
+    let localPath = fileUrl;
+    if (/^file:\/\//i.test(localPath)) {
+      try {
+        const { fileURLToPath } = await import("node:url");
+        localPath = fileURLToPath(localPath);
+      } catch {
+        localPath = localPath.replace(/^file:\/\/\/?/i, "");
+      }
+    }
+    const buffer = await readFile(localPath);
     return { buffer, contentType: undefined };
   }
 }

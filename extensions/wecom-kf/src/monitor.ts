@@ -8,7 +8,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { createLogger, type Logger } from "@openclaw-china/shared";
+import { createLogger, detectMediaType as detectSharedMediaType, type Logger } from "@openclaw-china/shared";
 
 import type { ResolvedWecomKfAccount, WecomKfInboundMessage } from "./types.js";
 import type { PluginConfig } from "./config.js";
@@ -18,7 +18,15 @@ import {
 } from "./crypto.js";
 import { dispatchWecomKfMessage } from "./bot.js";
 import { tryGetWecomKfRuntime } from "./runtime.js";
-import { syncMessages, sendKfMessage, sendKfEventMessage, splitActiveTextChunks } from "./api.js";
+import {
+  syncMessages,
+  sendKfMessage,
+  sendKfEventMessage,
+  splitActiveTextChunks,
+  downloadAndSendKfFile,
+  downloadAndSendKfImage,
+  downloadAndSendKfVideo,
+} from "./api.js";
 import {
   getLastProcessedSendTime,
   getPersistedSyncCursor,
@@ -247,6 +255,26 @@ async function handleSingleMessage(
         }
       } catch (sendErr) {
         logger.error(`send_msg error: ${String(sendErr)}`);
+      }
+    },
+    onMedia: async (mediaUrl: string) => {
+      if (!target.account.canSend || !activeTarget) return;
+      try {
+        const mediaType = detectSharedMediaType(mediaUrl);
+        let result;
+        if (mediaType === "image") {
+          result = await downloadAndSendKfImage(target.account, activeTarget, mediaUrl);
+        } else if (mediaType === "video") {
+          result = await downloadAndSendKfVideo(target.account, activeTarget, mediaUrl);
+        } else {
+          result = await downloadAndSendKfFile(target.account, activeTarget, mediaUrl);
+        }
+        if (!result.ok) {
+          logger.error(`send_media failed: type=${mediaType} errcode=${result.errcode} errmsg=${result.errmsg}`);
+        }
+        target.statusSink?.({ lastOutboundAt: Date.now() });
+      } catch (sendErr) {
+        logger.error(`send_media error: ${String(sendErr)}`);
       }
     },
     onError: (err: unknown) => {

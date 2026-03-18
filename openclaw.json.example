@@ -1,0 +1,324 @@
+{
+  // =========================
+  // Agent / 模型默认行为
+  // =========================
+  "agent": {
+    // 默认主模型（会话未覆盖时使用）
+    "model": "openai/gpt-4.5",
+    // 默认思考等级：off|minimal|low|medium|high|xhigh|adaptive
+    "thinking": "medium",
+    // 默认是否显示详细使用信息
+    "usage": "tokens", // off|tokens|full
+    // 默认是否 verbose 日志（仅对当前 agent 输出）
+    "verbose": false
+  },
+
+  "agents": {
+    "defaults": {
+      // ===== 模型选择与回退 =====
+      "model": {
+        // 全局主模型（文本）
+        "primary": "openai/gpt-4.5",
+        // 故障转移回退模型列表（按顺序尝试）
+        "fallbacks": [
+          "openai/gpt-4.1-mini",
+          "anthropic/claude-opus-4-6"
+        ]
+      },
+      // 图片模型与回退
+      "imageModel": {
+        "primary": "openai/dall-e-3",
+        "fallbacks": [
+          "openai/dall-e-2"
+        ]
+      },
+
+      // ===== 会话 / 沙箱 / 工作区 默认行为 =====
+      "workspace": {
+        // 工作区根目录（默认 ~/.openclaw/workspace）
+        "root": "~/.openclaw/workspace"
+      },
+      "sandbox": {
+        // "off"（全部直连宿主） / "non-main"（非 main 会话进 Docker） / "all"
+        "mode": "non-main"
+      },
+      "sessions": {
+        // 默认会话 key（直接聊天）
+        "mainKey": "main",
+        // 是否允许 group 会话自动创建
+        "allowAutoGroups": true
+      }
+    }
+  },
+
+  // =========================
+  // Gateway 网关配置
+  // =========================
+  "gateway": {
+    // 监听地址：loopback / 0.0.0.0 / 自定义
+    "bind": "loopback",
+    // 监听端口
+    "port": 18789,
+
+    // 认证与访问控制
+    "auth": {
+      // "off" / "password"
+      "mode": "password",
+      // 控制台登录密码（示例，实际请改）
+      "password": "change-me",
+      // 是否允许 Tailscale 身份直连（用于 serve 模式）
+      "allowTailscale": true
+    },
+
+    // Tailscale 暴露设置
+    "tailscale": {
+      // off / serve / funnel
+      "mode": "off",
+      // 退出时是否自动撤销 Serve/Funnel
+      "resetOnExit": false
+    },
+
+    // 控制 Web UI / WebChat
+    "web": {
+      "enableDashboard": true,
+      "enableWebChat": true
+    },
+
+    // 日志相关
+    "logging": {
+      // info / debug / warn / error
+      "level": "info",
+      // 是否写入文件
+      "file": {
+        "enabled": true,
+        "path": "~/.openclaw/logs/gateway.log",
+        "maxSizeMb": 50,
+        "maxBackups": 5
+      }
+    }
+  },
+
+  // =========================
+  // Channels 通道（只配置 Telegram）
+  // =========================
+  "channels": {
+    "telegram": {
+      // 机器人 Token（也可以通过 TELEGRAM_BOT_TOKEN 环境变量提供）
+      "botToken": "123456:ABCDEF",
+
+      // 允许对话的用户（手机号 / username / *）
+      // 为空时只允许 owner 通过 pairing 进入
+      "allowFrom": [
+        "*"
+      ],
+
+      // 群聊路由（可选）
+      "groups": {
+        "*": {
+          // 群聊是否要求 @ 提及才激活
+          "requireMention": true
+        }
+      },
+
+      // Webhook 配置（可选；不配置则走 long-poll）
+      "webhookUrl": "",
+      "webhookSecret": ""
+    }
+
+    // 其它通道 (whatsapp/slack/discord/...) 可按 docs 需要再补
+  },
+
+  // =========================
+  // Auth / 凭证与故障转移策略
+  // =========================
+  "auth": {
+    // 显式声明配置文件元数据（实际 key/token 不写这里）
+    "profiles": {
+      // 示例：openai 默认配置文件 ID
+      "openai:default": {
+        "provider": "openai",
+        "label": "OpenAI 默认账号"
+      },
+      "anthropic:default": {
+        "provider": "anthropic",
+        "label": "Anthropic 默认账号"
+      }
+    },
+
+    // 同一 provider 下多个 profile 的优先顺序
+    "order": {
+      "openai": ["openai:default"],
+      "anthropic": ["anthropic:default"]
+    },
+
+    // 冷却与退避策略
+    "cooldowns": {
+      // 账单失败退避起始小时数（全局）
+      "billingBackoffHours": 5,
+      // 每个 provider 单独覆盖
+      "billingBackoffHoursByProvider": {
+        "openai": 5,
+        "anthropic": 5
+      },
+      // 账单退避最大时长
+      "billingMaxHours": 24,
+      // 错误统计窗口（小时），超过则重置退避计数
+      "failureWindowHours": 24
+    }
+  },
+
+  // =========================
+  // Sessions / 会话存储与剪枝
+  // =========================
+  "sessions": {
+    // 存储后端：file / sqlite / postgres（示例用 file）
+    "store": "file",
+    // 本地文件存储路径
+    "path": "~/.openclaw/sessions",
+    // 会话剪枝策略
+    "pruning": {
+      // 每个会话最多保留多少轮消息
+      "maxTurns": 200,
+      // 每条消息的最大 token（超过会被裁剪或压缩）
+      "maxTokensPerMessage": 4000
+    },
+    // 转录 / 记录相关
+    "transcript": {
+      // 是否为所有会话保留完整转录
+      "enabled": true
+    }
+  },
+
+  // =========================
+  // Cron / 自动任务
+  // =========================
+  "cron": {
+    "enabled": true,
+    // 示例：cron job 列表（根据需要添加）
+    "jobs": [
+      {
+        "id": "daily-compact",
+        "schedule": "0 3 * * *",
+        "action": "sessions.compact"
+      }
+    ]
+  },
+
+  // =========================
+  // Docker / 沙箱执行
+  // =========================
+  "docker": {
+    "sandbox": {
+      // Docker 镜像名称
+      "image": "ghcr.io/openclaw/openclaw-sandbox:latest",
+      // 网络模式（默认为桥接）
+      "network": "bridge",
+      // 额外挂载
+      "mounts": []
+    }
+  },
+
+  // =========================
+  // Browser / 节点
+  // =========================
+  "browser": {
+    "enabled": true,
+    // Chrome/Chromium profile 存储目录
+    "profileDir": "~/.openclaw/browser-profile"
+  },
+
+  "nodes": {
+    // 是否允许节点连接（macOS/iOS/Android）
+    "enabled": true,
+    // 默认 pairing 行为
+    "pairing": {
+      // 是否允许任意新设备配对（否则需手动 approve）
+      "allowNewDevices": true
+    }
+  },
+
+  // =========================
+  // Tools / 工具策略（含 profile 字段）
+  // =========================
+  "tools": {
+    // 工具策略预设：minimal / default / full
+    // - minimal: 只开启最安全的一小部分
+    // - default: 官方推荐
+    // - full: 开启最大工具集（适合单人、可信环境）
+    "profile": "full",
+
+    // 显式允许的工具（可选，profile 为基础，再加白名单）
+    "allow": [
+      "bash",
+      "process",
+      "read",
+      "write",
+      "edit",
+      "browser",
+      "nodes",
+      "cron",
+      "sessions_list",
+      "sessions_history",
+      "sessions_send",
+      "sessions_spawn"
+    ],
+
+    // 显式禁止的工具（比 allow 优先级更高）
+    "deny": [
+      // 例如在群聊环境禁用 browser/canvas/nodes
+    ]
+  },
+
+  // =========================
+  // Commands / 聊天内命令行为
+  // =========================
+  "commands": {
+    // 原生命令（以 / 开头，例如 /status /new 等）
+    "native": {
+      "enabled": true,
+      // 是否允许在所有通道使用（否则可按通道细分）
+      "allowEverywhere": true
+    },
+    // 文本命令（例如 "!help" 这类前缀）
+    "text": {
+      "enabled": true,
+      "prefixes": [
+        "!",
+        "？"
+      ]
+    }
+  },
+
+  // =========================
+  // Logging / 日志全局配置
+  // =========================
+  "logging": {
+    "level": "info",
+    "color": true
+  },
+
+  // =========================
+  // Daemon / 守护进程安装
+  // =========================
+  "daemon": {
+    // 是否在 `openclaw onboard --install-daemon` 时安装守护进程
+    "install": true,
+    // 重启策略：always / on-failure / never
+    "restart": "always"
+  },
+
+  // =========================
+  // Plugins / 插件自动启用
+  // =========================
+  "plugins": {
+    // 初次运行时自动启用的插件（按 id）
+    "autoEnable": [
+      "openai",
+      "ollama",
+      "telegram",
+      "discord"
+    ],
+    // 手动禁用的插件列表
+    "disable": []
+  }
+}

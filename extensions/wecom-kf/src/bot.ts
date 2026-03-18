@@ -14,9 +14,14 @@ import {
   appendCronHiddenPrompt,
   checkDmPolicy,
   createLogger,
+  extractMediaFromText,
+  normalizeLocalPath,
   transcribeTencentFlash,
   type Logger,
 } from "@openclaw-china/shared";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { readFile } from "node:fs/promises";
 
 import type { PluginRuntime } from "./runtime.js";
@@ -37,6 +42,7 @@ import {
 
 export type WecomKfDispatchHooks = {
   onChunk: (text: string) => void | Promise<void>;
+  onMedia?: (mediaUrl: string) => void | Promise<void>;
   onError?: (err: unknown) => void;
 };
 
@@ -98,6 +104,102 @@ function formatASRErrorLog(err: unknown): string {
 const VOICE_ASR_FALLBACK_TEXT = "当前语音功能未启动或识别失败，请稍后重试。";
 const VOICE_ASR_ERROR_MAX_LENGTH = 500;
 const STALE_INBOUND_GRACE_MS = 5_000;
+
+const OFFICE_FILE_EXTENSIONS = new Set([
+  "pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx",
+  "txt", "md", "rtf", "odt", "ods", "html", "htm",
+]);
+
+function extractMediaLinesFromText(params: {
+  text: string;
+  logger?: Logger;
+}): { text: string; mediaUrls: string[] } {
+  const { text, logger } = params;
+
+  const result = extractMediaFromText(text, {
+    removeFromText: true,
+    checkExists: true,
+    existsSync: (p: string) => {
+      const exists = fs.existsSync(p);
+      if (!exists) {
+        logger?.warn?.(`[wecom-kf] local media not found: ${p}`);
+      }
+      return exists;
+    },
+    parseMediaLines: true,
+    parseMarkdownImages: false,
+    parseHtmlImages: false,
+    parseBarePaths: true,
+    parseMarkdownLinks: true,
+  });
+
+  const mediaUrls = result.all
+    .map((m) => (m.isLocal ? m.localPath ?? m.source : m.source))
+    .filter((m): m is string => typeof m === "string" && m.trim().length > 0);
+
+  return { text: result.text, mediaUrls };
+}
+
+function resolveWorkspaceDir(cfg: unknown): string | undefined {
+  const raw = (cfg as Record<string, unknown> | undefined)?.workspaceDir;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  const defaultDir = path.join(os.homedir(), ".openclaw", "workspace");
+  try {
+    if (fs.existsSync(defaultDir) && fs.statSync(defaultDir).isDirectory()) return defaultDir;
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+function scanWorkspaceFiles(dir: string): Map<string, number> {
+  const result = new Map<string, number>();
+  const walk = (current: string, depth: number) => {
+    if (depth > 5) return;
+    try {
+      const entries = fs.readdirSync(current, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name.startsWith(".")) continue;
+        const fullPath = path.join(current, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath, depth + 1);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        const ext = path.extname(entry.name).toLowerCase().slice(1);
+        if (!OFFICE_FILE_EXTENSIONS.has(ext)) continue;
+        try {
+          const stat = fs.statSync(fullPath);
+          result.set(fullPath, stat.mtimeMs);
+        } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+  };
+  walk(dir, 0);
+  return result;
+}
+
+function findNewWorkspaceFiles(
+  before: Map<string, number>,
+  after: Map<string, number>,
+  alreadySent: Set<string>,
+): string[] {
+  const newFiles: string[] = [];
+  for (const [filePath, mtimeMs] of after) {
+    if (alreadySent.has(filePath)) continue;
+    const prevMtime = before.get(filePath);
+    if (prevMtime === undefined || mtimeMs > prevMtime) {
+      newFiles.push(filePath);
+    }
+  }
+  return newFiles;
+}
+
+function normalizeMediaUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^file:\/\//i.test(trimmed) || trimmed.startsWith("~") || trimmed.startsWith("MEDIA:") || trimmed.startsWith("attachment://")) {
+    return normalizeLocalPath(trimmed);
+  }
+  return trimmed;
+}
 
 function trimTextForReply(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
@@ -560,17 +662,77 @@ export async function dispatchWecomKfMessage(params: {
     ? channel.text.resolveMarkdownTableMode({ cfg: safeCfg, channel: "wecom-kf", accountId: account.accountId })
     : undefined;
 
+  const workspaceDir = resolveWorkspaceDir(safeCfg);
+  logger.warn(`workspace scan: dir=${workspaceDir ?? "NONE"}`);
+  const preDispatchFiles = workspaceDir ? scanWorkspaceFiles(workspaceDir) : new Map<string, number>();
+  if (workspaceDir) {
+    logger.warn(`workspace scan: pre-dispatch files=${preDispatchFiles.size}`);
+  }
+  const allSentMedia = new Set<string>();
+
   await channel.reply.dispatchReplyWithBufferedBlockDispatcher({
     ctx: ctxPayload,
     cfg: safeCfg,
     dispatcherOptions: {
-      deliver: async (payload: { text?: string }) => {
-        const rawText = payload.text ?? "";
-        if (!rawText.trim()) return;
-        const converted = channel.text?.convertMarkdownTables && tableMode
-          ? channel.text.convertMarkdownTables(rawText, tableMode)
-          : rawText;
-        await hooks.onChunk(converted);
+      deliver: async (payload: Record<string, unknown>) => {
+        const rawText = String(payload.text ?? "");
+        const payloadMediaUrl = payload.mediaUrl != null ? String(payload.mediaUrl).trim() : "";
+        const payloadMediaUrls = Array.isArray(payload.mediaUrls) ? payload.mediaUrls : [];
+
+        const knownKeys = ["text", "mediaUrl", "mediaUrls", "type", "confidence"];
+        const extraKeys = Object.keys(payload).filter((k) => !knownKeys.includes(k));
+        logger.warn(
+          `deliver payload: text=${rawText.length}chars mediaUrl=${payloadMediaUrl || "NONE"} ` +
+          `mediaUrls=${payloadMediaUrls.length} extraKeys=[${extraKeys.join(",")}]`,
+        );
+
+        const collectedPayloadMedia = [
+          ...payloadMediaUrls.map((entry) => String(entry ?? "").trim()),
+          ...(payloadMediaUrl ? [payloadMediaUrl] : []),
+        ]
+          .filter(Boolean)
+          .map(normalizeMediaUrl);
+
+        const { text: textWithoutMediaLines, mediaUrls: mediaFromLines } = extractMediaLinesFromText({
+          text: rawText,
+          logger,
+        });
+
+        if (mediaFromLines.length > 0) {
+          logger.warn(`extracted ${mediaFromLines.length} media from text: ${mediaFromLines.join(", ")}`);
+        }
+
+        const allMediaUrls: string[] = [];
+        const seenMedia = new Set<string>();
+        for (const url of collectedPayloadMedia) {
+          if (!seenMedia.has(url)) {
+            seenMedia.add(url);
+            allMediaUrls.push(url);
+          }
+        }
+        for (const url of mediaFromLines) {
+          if (!seenMedia.has(url)) {
+            seenMedia.add(url);
+            allMediaUrls.push(url);
+          }
+        }
+
+        if (!textWithoutMediaLines.trim() && allMediaUrls.length === 0) return;
+
+        if (textWithoutMediaLines.trim()) {
+          const converted = channel.text?.convertMarkdownTables && tableMode
+            ? channel.text.convertMarkdownTables(textWithoutMediaLines, tableMode)
+            : textWithoutMediaLines;
+          await hooks.onChunk(converted);
+        }
+
+        if (allMediaUrls.length > 0 && hooks.onMedia) {
+          for (const mediaUrl of allMediaUrls) {
+            logger.warn(`sending media via onMedia: ${mediaUrl}`);
+            allSentMedia.add(mediaUrl);
+            await hooks.onMedia(mediaUrl);
+          }
+        }
       },
       onError: (err: unknown, info: { kind: string }) => {
         hooks.onError?.(err);
@@ -578,6 +740,26 @@ export async function dispatchWecomKfMessage(params: {
       },
     },
   });
+
+  if (workspaceDir && hooks.onMedia) {
+    try {
+      const postDispatchFiles = scanWorkspaceFiles(workspaceDir);
+      const newFiles = findNewWorkspaceFiles(preDispatchFiles, postDispatchFiles, allSentMedia);
+      logger.warn(
+        `workspace scan: post-dispatch files=${postDispatchFiles.size} newFiles=${newFiles.length}` +
+        (newFiles.length > 0 ? ` [${newFiles.map((f) => path.basename(f)).join(", ")}]` : ""),
+      );
+      for (const filePath of newFiles) {
+        logger.warn(`sending workspace file via onMedia: ${path.basename(filePath)}`);
+        allSentMedia.add(filePath);
+        await hooks.onMedia(filePath);
+      }
+    } catch (scanErr) {
+      logger.error(`workspace file scan error: ${String(scanErr)}`);
+    }
+  } else {
+    logger.warn(`workspace scan skipped: dir=${workspaceDir ?? "NONE"} hasOnMedia=${!!hooks.onMedia}`);
+  }
 
   await cleanup();
 }
