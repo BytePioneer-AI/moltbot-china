@@ -1,0 +1,102 @@
+{
+  "name": "@openclaw-china/wechat-mp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenClaw WeChat Official Account (微信公众号) channel plugin",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@openclaw-china/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wechat-mp",
+      "label": "WeChat MP",
+      "selectionLabel": "WeChat Official Account (微信公众号)",
+      "docsPath": "/channels/wechat-mp",
+      "blurb": "微信公众号渠道，支持关注用户通过公众号与 AI 交互",
+      "aliases": [
+        "weixin-mp",
+        "微信公众号",
+        "公众号"
+      ],
+      "order": 81
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wechat-mp",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  },
+  "moltbot": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wechat-mp",
+      "label": "WeChat MP",
+      "selectionLabel": "WeChat Official Account (微信公众号)",
+      "docsPath": "/channels/wechat-mp",
+      "blurb": "微信公众号渠道，支持关注用户通过公众号与 AI 交互",
+      "aliases": [
+        "weixin-mp",
+        "微信公众号",
+        "公众号"
+      ],
+      "order": 81
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wechat-mp",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  },
+  "clawdbot": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "wechat-mp",
+      "label": "WeChat MP",
+      "selectionLabel": "WeChat Official Account (微信公众号)",
+      "docsPath": "/channels/wechat-mp",
+      "blurb": "微信公众号渠道，支持关注用户通过公众号与 AI 交互",
+      "aliases": [
+        "weixin-mp",
+        "微信公众号",
+        "公众号"
+      ],
+      "order": 81
+    },
+    "install": {
+      "npmSpec": "@openclaw-china/wechat-mp",
+      "localPath": ".",
+      "defaultChoice": "npm"
+    }
+  }
+}

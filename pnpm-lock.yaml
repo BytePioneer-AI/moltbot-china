@@ -124,6 +124,22 @@ importers:
         specifier: ^3.23.0
         version: 3.25.76
 
+  extensions/wechat-mp:
+    dependencies:
+      '@openclaw-china/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.7
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.7)
+
   extensions/wecom:
     dependencies:
       '@openclaw-china/shared':
@@ -228,6 +244,9 @@ importers:
       '@openclaw-china/shared':
         specifier: workspace:*
         version: link:../shared
+      '@openclaw-china/wechat-mp':
+        specifier: workspace:*
+        version: link:../../extensions/wechat-mp
       '@openclaw-china/wecom':
         specifier: workspace:*
         version: link:../../extensions/wecom

@@ -44,6 +44,31 @@ type ConfigRoot = {
 
 const CLI_STATE_KEY = Symbol.for("@openclaw-china/china-cli-state");
 
+function setupTTYMocks(): () => void {
+  const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+  const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+
+  vi.clearAllMocks();
+  delete (globalThis as Record<PropertyKey, unknown>)[CLI_STATE_KEY];
+  Object.defineProperty(process.stdin, "isTTY", {
+    configurable: true,
+    value: true,
+  });
+  Object.defineProperty(process.stdout, "isTTY", {
+    configurable: true,
+    value: true,
+  });
+
+  return () => {
+    if (stdinDescriptor) {
+      Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+    }
+    if (stdoutDescriptor) {
+      Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+    }
+  };
+}
+
 function createCommandNode(): CommandNode {
   const node: CommandNode = {
     children: new Map<string, CommandNode>(),
@@ -103,29 +128,14 @@ async function runSetup(
 }
 
 describe("china setup wecom", () => {
-  const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
-  const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  let restoreTTY: (() => void) | undefined;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    delete (globalThis as Record<PropertyKey, unknown>)[CLI_STATE_KEY];
-    Object.defineProperty(process.stdin, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-    Object.defineProperty(process.stdout, "isTTY", {
-      configurable: true,
-      value: true,
-    });
+    restoreTTY = setupTTYMocks();
   });
 
   afterEach(() => {
-    if (stdinDescriptor) {
-      Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
-    }
-    if (stdoutDescriptor) {
-      Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
-    }
+    restoreTTY?.();
   });
 
   it("stores ws-only credentials for wecom setup", async () => {
@@ -183,30 +193,57 @@ describe("china setup wecom", () => {
   });
 });
 
-describe("china setup wecom-kf", () => {
-  const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
-  const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+describe("china setup wechat-mp", () => {
+  let restoreTTY: (() => void) | undefined;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    delete (globalThis as Record<PropertyKey, unknown>)[CLI_STATE_KEY];
-    Object.defineProperty(process.stdin, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-    Object.defineProperty(process.stdout, "isTTY", {
-      configurable: true,
-      value: true,
-    });
+    restoreTTY = setupTTYMocks();
   });
 
   afterEach(() => {
-    if (stdinDescriptor) {
-      Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
-    }
-    if (stdoutDescriptor) {
-      Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
-    }
+    restoreTTY?.();
+  });
+
+  it("stores wechat-mp callback and account config", async () => {
+    selectMock
+      .mockResolvedValueOnce("wechat-mp")
+      .mockResolvedValueOnce("safe")
+      .mockResolvedValueOnce("passive");
+    textMock
+      .mockResolvedValueOnce("/wechat-mp")
+      .mockResolvedValueOnce("wx-test-appid")
+      .mockResolvedValueOnce("wx-test-secret")
+      .mockResolvedValueOnce("callback-token")
+      .mockResolvedValueOnce("encoding-aes-key")
+      .mockResolvedValueOnce("欢迎关注");
+
+    const { writeConfigFile } = await runSetup({}, ["wechat-mp"]);
+
+    expect(writeConfigFile).toHaveBeenCalledTimes(1);
+    const savedConfig = writeConfigFile.mock.calls[0]?.[0] as ConfigRoot;
+    const wechatMpConfig = savedConfig.channels?.["wechat-mp"];
+
+    expect(wechatMpConfig?.enabled).toBe(true);
+    expect(wechatMpConfig?.webhookPath).toBe("/wechat-mp");
+    expect(wechatMpConfig?.appId).toBe("wx-test-appid");
+    expect(wechatMpConfig?.appSecret).toBe("wx-test-secret");
+    expect(wechatMpConfig?.token).toBe("callback-token");
+    expect(wechatMpConfig?.encodingAESKey).toBe("encoding-aes-key");
+    expect(wechatMpConfig?.messageMode).toBe("safe");
+    expect(wechatMpConfig?.replyMode).toBe("passive");
+    expect(wechatMpConfig?.welcomeText).toBe("欢迎关注");
+  });
+});
+
+describe("china setup wecom-kf", () => {
+  let restoreTTY: (() => void) | undefined;
+
+  beforeEach(() => {
+    restoreTTY = setupTTYMocks();
+  });
+
+  afterEach(() => {
+    restoreTTY?.();
   });
 
   it("stores only the initial wecom-kf callback setup fields", async () => {
@@ -270,29 +307,14 @@ describe("china setup wecom-kf", () => {
 });
 
 describe("china setup dingtalk", () => {
-  const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
-  const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  let restoreTTY: (() => void) | undefined;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    delete (globalThis as Record<PropertyKey, unknown>)[CLI_STATE_KEY];
-    Object.defineProperty(process.stdin, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-    Object.defineProperty(process.stdout, "isTTY", {
-      configurable: true,
-      value: true,
-    });
+    restoreTTY = setupTTYMocks();
   });
 
   afterEach(() => {
-    if (stdinDescriptor) {
-      Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
-    }
-    if (stdoutDescriptor) {
-      Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
-    }
+    restoreTTY?.();
   });
 
   it("stores gateway token when dingtalk AI Card streaming is enabled", async () => {

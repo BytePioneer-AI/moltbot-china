@@ -55,9 +55,10 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
-    "@openclaw-china/dingtalk": "workspace:*",
-    "@openclaw-china/feishu-china": "workspace:*",
-    "@openclaw-china/qqbot": "workspace:*",
+    "@openclaw-china/dingtalk": "2026.3.9-1",
+    "@openclaw-china/feishu-china": "2026.3.9-1",
+    "@openclaw-china/qqbot": "2026.3.9-1",
+    "@openclaw-china/wechat-mp": "workspace:*",
     "@openclaw-china/shared": "workspace:*",
     "@openclaw-china/wecom": "workspace:*",
     "@openclaw-china/wecom-app": "workspace:*",

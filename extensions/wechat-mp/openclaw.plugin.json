@@ -1,0 +1,83 @@
+{
+  "id": "wechat-mp",
+  "name": "WeChat MP",
+  "description": "微信公众号渠道插件，支持关注用户通过公众号与 AI 交互",
+  "version": "0.1.0",
+  "channels": ["wechat-mp"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "name": { "type": "string" },
+      "appId": { "type": "string" },
+      "appSecret": { "type": "string" },
+      "encodingAESKey": { "type": "string" },
+      "token": { "type": "string" },
+      "webhookPath": { "type": "string" },
+      "messageMode": {
+        "type": "string",
+        "enum": ["plain", "safe", "compat"]
+      },
+      "replyMode": {
+        "type": "string",
+        "enum": ["passive", "active"]
+      },
+      "activeDeliveryMode": {
+        "type": "string",
+        "enum": ["merged", "split"]
+      },
+      "welcomeText": { "type": "string" },
+      "dmPolicy": {
+        "type": "string",
+        "enum": ["open", "pairing", "allowlist", "disabled"]
+      },
+      "allowFrom": { "type": "array", "items": { "type": "string" } },
+      "defaultAccount": { "type": "string" },
+      "accounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "enabled": { "type": "boolean" },
+            "appId": { "type": "string" },
+            "appSecret": { "type": "string" },
+            "encodingAESKey": { "type": "string" },
+            "token": { "type": "string" },
+            "webhookPath": { "type": "string" },
+            "messageMode": {
+              "type": "string",
+              "enum": ["plain", "safe", "compat"]
+            },
+            "replyMode": {
+              "type": "string",
+              "enum": ["passive", "active"]
+            },
+            "activeDeliveryMode": {
+              "type": "string",
+              "enum": ["merged", "split"]
+            },
+            "welcomeText": { "type": "string" },
+            "dmPolicy": {
+              "type": "string",
+              "enum": ["open", "pairing", "allowlist", "disabled"]
+            },
+            "allowFrom": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "appId": { "label": "公众号 AppID" },
+    "appSecret": { "label": "公众号 AppSecret", "sensitive": true },
+    "encodingAESKey": { "label": "消息加密密钥 (EncodingAESKey)", "sensitive": true },
+    "token": { "label": "服务器配置 Token", "sensitive": true },
+    "webhookPath": { "label": "Webhook Path" },
+    "messageMode": { "label": "消息加解密模式 (plain/safe/compat)" },
+    "replyMode": { "label": "回复模式 (passive/active)" },
+    "activeDeliveryMode": { "label": "主动发送模式 (merged/split)" }
+  }
+}

@@ -24,6 +24,7 @@ const SUPPORTED_CHANNELS: readonly ChannelId[] = [
   "wecom",
   "wecom-app",
   "wecom-kf",
+  "wechat-mp",
   "qqbot",
 ];
 const CHINA_INSTALL_HINT_SHOWN_KEY = Symbol.for("@openclaw-china/china-install-hint-shown");

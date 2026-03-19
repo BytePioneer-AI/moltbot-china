@@ -60,3 +60,5 @@ extensions/wecom-app/test-server.mjs
 openclaw-multi-bot-config/
 .codex/
 # Independent projects
+.ccw/
+.workflow/

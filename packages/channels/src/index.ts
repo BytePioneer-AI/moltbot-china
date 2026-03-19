@@ -60,6 +60,14 @@ import {
   getQQBotRuntime,
 } from "@openclaw-china/qqbot";
 import qqbotEntry from "@openclaw-china/qqbot";
+import {
+  wechatMpPlugin,
+  DEFAULT_ACCOUNT_ID as WECHAT_MP_DEFAULT_ACCOUNT_ID,
+  setWechatMpRuntime,
+  getWechatMpRuntime,
+  sendWechatMpActiveText,
+} from "@openclaw-china/wechat-mp";
+import wechatMpEntry from "@openclaw-china/wechat-mp";
 import { registerChinaSetupCli, showChinaInstallHint } from "@openclaw-china/shared";
 
 export {
@@ -97,6 +105,11 @@ export {
   QQBOT_DEFAULT_ACCOUNT_ID,
   setQQBotRuntime,
   getQQBotRuntime,
+  wechatMpPlugin,
+  WECHAT_MP_DEFAULT_ACCOUNT_ID,
+  setWechatMpRuntime,
+  getWechatMpRuntime,
+  sendWechatMpActiveText,
 };
 
 export type {
@@ -127,6 +140,14 @@ export type {
   SyncMsgResponse as WecomKfSyncMsgResponse,
 } from "@openclaw-china/wecom-kf";
 export type { QQBotConfig, ResolvedQQBotAccount, QQBotSendResult } from "@openclaw-china/qqbot";
+export type {
+  WechatMpConfig,
+  WechatMpAccountConfig,
+  ResolvedWechatMpAccount,
+  WechatMpDmPolicy,
+  WechatMpMessageMode,
+  WechatMpReplyMode,
+} from "@openclaw-china/wechat-mp";
 
 // TODO: 后续添加其他渠道
 // export { qqPlugin } from "@openclaw-china/qq";
@@ -170,6 +191,16 @@ export interface WecomKfRouteConfig extends ChannelConfig {
   >;
 }
 
+export interface WechatMpRouteConfig extends ChannelConfig {
+  webhookPath?: string;
+  accounts?: Record<
+    string,
+    {
+      webhookPath?: string;
+    }
+  >;
+}
+
 /**
  * Moltbot 配置接口（符合官方约定）
  * 配置路径: channels.<id>.enabled
@@ -181,6 +212,7 @@ export interface MoltbotConfig {
     wecom?: WecomRouteConfig;
     "wecom-app"?: WecomAppRouteConfig;
     "wecom-kf"?: WecomKfRouteConfig;
+    "wechat-mp"?: WechatMpRouteConfig;
     qqbot?: ChannelConfig;
     qq?: ChannelConfig;
     [key: string]: ChannelConfig | undefined;
@@ -214,7 +246,7 @@ export interface MoltbotPluginApi {
 /**
  * 支持的渠道列表
  */
-export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "qqbot"] as const;
+export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "wechat-mp", "qqbot"] as const;
 // TODO: 鍚庣画娣诲姞 "qq"
 
 export type SupportedChannel = (typeof SUPPORTED_CHANNELS)[number];
@@ -243,6 +275,11 @@ const channelPlugins: Record<SupportedChannel, { register: (api: MoltbotPluginAp
   "wecom-kf": {
     register: (api: MoltbotPluginApi) => {
       wecomKfEntry.register(api);
+    },
+  },
+  "wechat-mp": {
+    register: (api: MoltbotPluginApi) => {
+      wechatMpEntry.register(api);
     },
   },
   qqbot: {
@@ -309,7 +346,7 @@ export function registerChannelsByConfig(
 const channelsPlugin = {
   id: "channels",
   name: "Moltbot China Channels",
-  description: "统一渠道包，支持钉钉、飞书、企业微信、QQ Bot",
+  description: "统一渠道包，支持钉钉、飞书、企业微信、微信公众号、QQ Bot",
 
   configSchema: {
     type: "object",

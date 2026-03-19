@@ -14,8 +14,9 @@ const wecomPath = path.join(root, "extensions", "wecom", "package.json");
 const wecomAppPath = path.join(root, "extensions", "wecom-app", "package.json");
 const wecomKfPath = path.join(root, "extensions", "wecom-kf", "package.json");
 const qqbotPath = path.join(root, "extensions", "qqbot", "package.json");
+const wechatMpPath = path.join(root, "extensions", "wechat-mp", "package.json");
 const channelsPath = path.join(root, "packages", "channels", "package.json");
-const channelIds = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "qqbot"];
+const channelIds = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "wechat-mp", "qqbot"];
 
 function printUsage() {
   console.log(`
@@ -253,6 +254,7 @@ const wecomPkg = readJson(wecomPath);
 const wecomAppPkg = readJson(wecomAppPath);
 const wecomKfPkg = readJson(wecomKfPath);
 const qqbotPkg = readJson(qqbotPath);
+const wechatMpPkg = readJson(wechatMpPath);
 const channelsPkg = readJson(channelsPath);
 
 const originalShared = readJson(sharedPath);
@@ -262,6 +264,7 @@ const originalWecom = readJson(wecomPath);
 const originalWecomApp = readJson(wecomAppPath);
 const originalWecomKf = readJson(wecomKfPath);
 const originalQqbot = readJson(qqbotPath);
+const originalWechatMp = readJson(wechatMpPath);
 const originalChannels = readJson(channelsPath);
 
 try {
@@ -279,6 +282,7 @@ try {
     wecom: { pkg: wecomPkg, path: wecomPath },
     "wecom-app": { pkg: wecomAppPkg, path: wecomAppPath },
     "wecom-kf": { pkg: wecomKfPkg, path: wecomKfPath },
+    "wechat-mp": { pkg: wechatMpPkg, path: wechatMpPath },
     qqbot: { pkg: qqbotPkg, path: qqbotPath },
   };
 
@@ -302,6 +306,7 @@ try {
       options.version
     );
     const nextQqbot = getReleaseVersion(qqbotPkg.name, qqbotPkg.version, options.version);
+    const nextWechatMp = getReleaseVersion(wechatMpPkg.name, wechatMpPkg.version, options.version);
     const nextChannels = getReleaseVersion(
       channelsPkg.name,
       channelsPkg.version,
@@ -341,6 +346,11 @@ try {
     qqbotPkg.dependencies = qqbotPkg.dependencies ?? {};
     qqbotPkg.dependencies["@openclaw-china/shared"] = nextShared;
 
+    wechatMpPkg.version = nextWechatMp;
+    wechatMpPkg.private = false;
+    wechatMpPkg.dependencies = wechatMpPkg.dependencies ?? {};
+    wechatMpPkg.dependencies["@openclaw-china/shared"] = nextShared;
+
     channelsPkg.version = nextChannels;
     channelsPkg.dependencies = channelsPkg.dependencies ?? {};
     channelsPkg.dependencies["@openclaw-china/dingtalk"] = nextDingtalk;
@@ -348,6 +358,7 @@ try {
     channelsPkg.dependencies["@openclaw-china/wecom"] = nextWecom;
     channelsPkg.dependencies["@openclaw-china/wecom-app"] = nextWecomApp;
     channelsPkg.dependencies["@openclaw-china/wecom-kf"] = nextWecomKf;
+    channelsPkg.dependencies["@openclaw-china/wechat-mp"] = nextWechatMp;
     channelsPkg.dependencies["@openclaw-china/qqbot"] = nextQqbot;
     channelsPkg.dependencies["@openclaw-china/shared"] = nextShared;
 
@@ -358,6 +369,7 @@ try {
     writeJson(wecomAppPath, wecomAppPkg);
     writeJson(wecomKfPath, wecomKfPkg);
     writeJson(qqbotPath, qqbotPkg);
+    writeJson(wechatMpPath, wechatMpPkg);
     writeJson(channelsPath, channelsPkg);
 
     run("pnpm -F @openclaw-china/shared build");
@@ -366,6 +378,7 @@ try {
     run("pnpm -F @openclaw-china/wecom build");
     run("pnpm -F @openclaw-china/wecom-app build");
     run("pnpm -F @openclaw-china/wecom-kf build");
+    run("pnpm -F @openclaw-china/wechat-mp build");
     run("pnpm -F @openclaw-china/qqbot build");
     run("pnpm -F @openclaw-china/channels build");
 
@@ -375,6 +388,7 @@ try {
     publishPackage(path.join(root, "extensions", "wecom"), options.tag);
     publishPackage(path.join(root, "extensions", "wecom-app"), options.tag);
     publishPackage(path.join(root, "extensions", "wecom-kf"), options.tag);
+    publishPackage(path.join(root, "extensions", "wechat-mp"), options.tag);
     publishPackage(path.join(root, "extensions", "qqbot"), options.tag);
     publishPackage(path.join(root, "packages", "channels"), options.tag);
   } else {
@@ -474,6 +488,10 @@ try {
     originalQqbot.dependencies["@openclaw-china/shared"] =
       originalQqbot.dependencies["@openclaw-china/shared"] ?? "workspace:*";
   }
+  if (originalWechatMp.dependencies) {
+    originalWechatMp.dependencies["@openclaw-china/shared"] =
+      originalWechatMp.dependencies["@openclaw-china/shared"] ?? "workspace:*";
+  }
   if (originalChannels.dependencies) {
     originalChannels.dependencies["@openclaw-china/dingtalk"] =
       originalChannels.dependencies["@openclaw-china/dingtalk"] ?? "workspace:*";
@@ -485,6 +503,8 @@ try {
       originalChannels.dependencies["@openclaw-china/wecom-app"] ?? "workspace:*";
     originalChannels.dependencies["@openclaw-china/wecom-kf"] =
       originalChannels.dependencies["@openclaw-china/wecom-kf"] ?? "workspace:*";
+    originalChannels.dependencies["@openclaw-china/wechat-mp"] =
+      originalChannels.dependencies["@openclaw-china/wechat-mp"] ?? "workspace:*";
     originalChannels.dependencies["@openclaw-china/qqbot"] =
       originalChannels.dependencies["@openclaw-china/qqbot"] ?? "workspace:*";
   }
@@ -496,5 +516,6 @@ try {
   writeJson(wecomAppPath, originalWecomApp);
   writeJson(wecomKfPath, originalWecomKf);
   writeJson(qqbotPath, originalQqbot);
+  writeJson(wechatMpPath, originalWechatMp);
   writeJson(channelsPath, originalChannels);
 }
