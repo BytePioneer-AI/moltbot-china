@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  WECOM_WS_FINISH_FALLBACK_MESSAGE,
   WECOM_WS_THINKING_MESSAGE,
   appendWecomWsActiveStreamChunk,
   appendWecomWsActiveStreamReply,
@@ -254,14 +253,14 @@ describe("wecom ws reply context", () => {
     });
   });
 
-  it("replaces the thinking placeholder with a visible finish message when no real chunk arrives", async () => {
-    const sent: unknown[] = [];
+  it("closes the thinking placeholder without a visible finish message when no real chunk arrives", async () => {
+    const sent: Array<{ body?: { stream?: { id?: string; finish?: boolean; content?: string } } }> = [];
     registerWecomWsMessageContext({
       accountId: "acc-1",
       reqId: "req-thinking-only",
       to: "user:alice",
       send: async (frame) => {
-        sent.push(frame);
+        sent.push(frame as { body?: { stream?: { id?: string; finish?: boolean; content?: string } } });
       },
       streamId: "stream-thinking-only",
     });
@@ -294,10 +293,10 @@ describe("wecom ws reply context", () => {
         stream: {
           id: "stream-thinking-only",
           finish: true,
-          content: WECOM_WS_FINISH_FALLBACK_MESSAGE,
         },
       },
     });
+    expect(sent[1].body?.stream?.content).toBeUndefined();
   });
 
   it("closes the thinking stream without a visible finish message when the reply was skipped", async () => {

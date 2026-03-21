@@ -47,7 +47,6 @@ const MESSAGE_CONTEXT_TTL_MS = 6 * 60 * 1000;
 const EVENT_CONTEXT_TTL_MS = 10 * 1000;
 const STREAM_FINISH_GRACE_MS = 2_500;
 export const WECOM_WS_THINKING_MESSAGE = "<think></think>";
-export const WECOM_WS_FINISH_FALLBACK_MESSAGE = "✅ 处理完成。";
 
 const messageContexts = new Map<string, WsMessageContext>();
 const eventContexts = new Map<string, WsEventContext>();
@@ -528,18 +527,11 @@ export async function finishWecomWsMessageContext(params: {
   if (!context || context.finished) return;
   await enqueue(context, async () => {
     const errorMessage = params.error ? `Error: ${params.error instanceof Error ? params.error.message : String(params.error)}` : "";
-    const finalContent = errorMessage
+    const finishContent = errorMessage
       ? context.content
         ? `${context.content}\n\n${errorMessage}`
         : errorMessage
       : context.content;
-    const fallbackContent =
-      !finalContent &&
-      !context.suppressVisibleFallback &&
-      context.placeholderContent === WECOM_WS_THINKING_MESSAGE
-        ? WECOM_WS_FINISH_FALLBACK_MESSAGE
-        : undefined;
-    const finishContent = finalContent || fallbackContent;
     const sendFinish = context.started || Boolean(finishContent) || context.msgItems.length > 0;
     if (sendFinish) {
       await context.send(
