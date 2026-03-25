@@ -8,7 +8,12 @@ function asConfig(value: PluginConfig): PluginConfig {
 
 describe("dingtalk multi-account setup", () => {
   it("migrates legacy root credentials into accounts.default before adding a named account", () => {
-    const next = dingtalkPlugin.setup.applyAccountConfig({
+    const setup = dingtalkPlugin.setup;
+    if (!setup) {
+      throw new Error("dingtalk setup adapter missing");
+    }
+
+    const next = setup.applyAccountConfig({
       cfg: asConfig({
         channels: {
           dingtalk: {
@@ -20,10 +25,10 @@ describe("dingtalk multi-account setup", () => {
         },
       }),
       accountId: "work",
-      config: {
+      input: {
         clientId: "work-id",
         clientSecret: "work-secret",
-      },
+      } as unknown as Parameters<typeof setup.applyAccountConfig>[0]["input"],
     }) as PluginConfig;
 
     expect(next.channels?.dingtalk).toEqual({
@@ -44,7 +49,12 @@ describe("dingtalk multi-account setup", () => {
   });
 
   it("applies omitted setup updates to the resolved default account", () => {
-    const next = dingtalkPlugin.setup.applyAccountConfig({
+    const setup = dingtalkPlugin.setup;
+    if (!setup) {
+      throw new Error("dingtalk setup adapter missing");
+    }
+
+    const next = setup.applyAccountConfig({
       cfg: asConfig({
         channels: {
           dingtalk: {
@@ -58,9 +68,10 @@ describe("dingtalk multi-account setup", () => {
           },
         },
       }),
-      config: {
+      accountId: "main",
+      input: {
         name: "Main Bot",
-      },
+      } as unknown as Parameters<typeof setup.applyAccountConfig>[0]["input"],
     }) as PluginConfig;
 
     expect(next.channels?.dingtalk).toMatchObject({
@@ -80,7 +91,12 @@ describe("dingtalk multi-account setup", () => {
 
 describe("dingtalk multi-account deletion", () => {
   it("deletes the resolved default account without dropping sibling accounts", () => {
-    const next = dingtalkPlugin.config.deleteAccount({
+    const deleteAccount = dingtalkPlugin.config.deleteAccount;
+    if (!deleteAccount) {
+      throw new Error("dingtalk deleteAccount adapter missing");
+    }
+
+    const next = deleteAccount({
       cfg: asConfig({
         channels: {
           dingtalk: {
@@ -98,6 +114,7 @@ describe("dingtalk multi-account deletion", () => {
           },
         },
       }),
+      accountId: "main",
     }) as PluginConfig;
 
     expect(next.channels?.dingtalk).toEqual({
@@ -112,7 +129,12 @@ describe("dingtalk multi-account deletion", () => {
   });
 
   it("removes only accounts.default when deleting a promoted default account", () => {
-    const next = dingtalkPlugin.config.deleteAccount({
+    const deleteAccount = dingtalkPlugin.config.deleteAccount;
+    if (!deleteAccount) {
+      throw new Error("dingtalk deleteAccount adapter missing");
+    }
+
+    const next = deleteAccount({
       cfg: asConfig({
         channels: {
           dingtalk: {
@@ -142,5 +164,23 @@ describe("dingtalk multi-account deletion", () => {
         },
       },
     });
+  });
+});
+
+describe("dingtalk messaging target normalization", () => {
+  it("normalizes host-facing targets to canonical user/group prefixes", () => {
+    const normalize = dingtalkPlugin.messaging?.normalizeTarget;
+    if (!normalize) {
+      throw new Error("dingtalk messaging.normalizeTarget missing");
+    }
+
+    expect(normalize("user:user-a")).toBe("user:user-a");
+    expect(normalize("group:group-a")).toBe("group:group-a");
+    expect(normalize("channel:group-a")).toBe("group:group-a");
+    expect(normalize("chat:group-a")).toBe("group:group-a");
+    expect(normalize("dingtalk:group:group-a")).toBe("group:group-a");
+    expect(normalize("@user-a")).toBe("user:user-a");
+    expect(normalize("#group-a")).toBe("group:group-a");
+    expect(normalize("user-a")).toBe("user:user-a");
   });
 });

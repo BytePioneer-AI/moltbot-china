@@ -143,9 +143,12 @@ describe("Feature: dingtalk-integration, Property 2: 消息解析正确性", () 
     fc.assert(
       fc.property(audioMessageArb, (raw) => {
         const ctx = parseDingtalkMessage(raw);
+        const audioContent =
+          typeof raw.content === "string" ? undefined : raw.content?.recognition?.trim();
+        expect(audioContent).toBeDefined();
         
         // Content should be the trimmed recognition text
-        expect(ctx.content).toBe(raw.content!.recognition!.trim());
+        expect(ctx.content).toBe(audioContent);
       }),
       { numRuns: 100 }
     );
@@ -515,7 +518,7 @@ describe("Feature: dingtalk-integration, Property 4: 上下文构建完整性", 
         const inboundCtx = buildInboundContext(ctx, sessionKey, accountId);
 
         if (ctx.chatType === "group") {
-          expect(inboundCtx.To).toBe(`chat:${ctx.conversationId}`);
+          expect(inboundCtx.To).toBe(`group:${ctx.conversationId}`);
           expect(inboundCtx.GroupSubject).toBe(ctx.conversationId);
         } else {
           expect(inboundCtx.To).toBe(`user:${ctx.senderId}`);

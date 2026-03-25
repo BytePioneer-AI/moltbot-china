@@ -118,13 +118,15 @@ export interface SendMediaParams {
   /** 目标 ID（用户 ID 或会话 ID） */
   to: string;
   /** 媒体 URL 或本地路径 */
-  mediaUrl: string;
+  mediaUrl?: string;
   /** 聊天类型 */
   chatType: "direct" | "group";
   /** 可选的媒体 Buffer */
   mediaBuffer?: Buffer;
   /** 可选的文件名 */
   fileName?: string;
+  /** 可选的 Content-Type */
+  contentType?: string;
 }
 
 /**
@@ -345,7 +347,7 @@ export async function uploadMediaDingtalk(params: {
 export async function sendMediaDingtalk(
   params: SendMediaParams
 ): Promise<DingtalkSendResult> {
-  const { cfg, to, mediaUrl, chatType, mediaBuffer, fileName } = params;
+  const { cfg, to, mediaUrl, chatType, mediaBuffer, fileName, contentType } = params;
 
   // 验证凭证
   if (!cfg.clientId || !cfg.clientSecret) {
@@ -362,6 +364,13 @@ export async function sendMediaDingtalk(
     // 使用提供的 Buffer
     buffer = mediaBuffer;
     name = fileName ?? "file";
+    detectedMediaType = detectMediaTypeFromContentType(contentType ?? null);
+    if (!path.extname(name) && contentType) {
+      const ext = getExtensionFromContentType(contentType);
+      if (ext) {
+        name = name + ext;
+      }
+    }
   } else if (mediaUrl) {
     if (isLocalPath(mediaUrl)) {
       // 本地文件路径
@@ -374,6 +383,13 @@ export async function sendMediaDingtalk(
       }
       buffer = fs.readFileSync(filePath);
       name = fileName ?? path.basename(filePath);
+      if (!path.extname(name) && contentType) {
+        const ext = getExtensionFromContentType(contentType);
+        if (ext) {
+          name = name + ext;
+        }
+      }
+      detectedMediaType = detectMediaTypeFromContentType(contentType ?? null);
     } else {
       // 远程 URL - 下载
       const controller = new AbortController();

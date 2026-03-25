@@ -69,7 +69,7 @@ describe("dingtalk reply dispatch", () => {
     setDingtalkRuntime(
       createRuntime({
         dispatchReplyWithDispatcher,
-      }) as DingtalkRuntime
+      }) as unknown as DingtalkRuntime
     );
 
     await handleDingtalkMessage({
@@ -104,7 +104,7 @@ describe("dingtalk reply dispatch", () => {
     setDingtalkRuntime(
       createRuntime({
         dispatchReplyWithBufferedBlockDispatcher,
-      }) as DingtalkRuntime
+      }) as unknown as DingtalkRuntime
     );
 
     await handleDingtalkMessage({
@@ -134,7 +134,7 @@ describe("dingtalk reply dispatch", () => {
     setDingtalkRuntime(
       createRuntime({
         dispatchReplyFromConfig,
-      }) as DingtalkRuntime
+      }) as unknown as DingtalkRuntime
     );
 
     await handleDingtalkMessage({

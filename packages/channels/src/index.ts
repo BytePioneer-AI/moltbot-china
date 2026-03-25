@@ -7,6 +7,12 @@
  * Requirements: Unified Package Entry, Unified Distribution
  */
 
+import {
+  definePluginEntry,
+  emptyPluginConfigSchema,
+  type OpenClawPluginApi,
+} from "openclaw/plugin-sdk/plugin-entry";
+
 // 导出 DingTalk 插件
 import {
   dingtalkPlugin,
@@ -222,29 +228,6 @@ export interface MoltbotConfig {
 }
 
 /**
- * Moltbot 插件 API 接口
- */
-export interface MoltbotPluginApi {
-  registerChannel: (opts: { plugin: unknown }) => void;
-  registerCli?: (
-    registrar: (ctx: { program: unknown; config?: MoltbotConfig }) => void | Promise<void>,
-    opts?: { commands?: string[] }
-  ) => void;
-  logger?: {
-    info?: (message: string) => void;
-    warn?: (message: string) => void;
-    error?: (message: string) => void;
-  };
-  runtime?: {
-    config?: {
-      writeConfigFile?: (cfg: unknown) => Promise<void>;
-    };
-  };
-  config?: MoltbotConfig;
-  [key: string]: unknown;
-}
-
-/**
  * 支持的渠道列表
  */
 export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-app", "wecom-kf", "wechat-mp", "qqbot"] as const;
@@ -252,40 +235,48 @@ export const SUPPORTED_CHANNELS = ["dingtalk", "feishu-china", "wecom", "wecom-a
 
 export type SupportedChannel = (typeof SUPPORTED_CHANNELS)[number];
 
-const channelPlugins: Record<SupportedChannel, { register: (api: MoltbotPluginApi) => void }> = {
+type ChannelEntry = {
+  register: (api: unknown) => void;
+};
+
+function registerChannelEntry(entry: ChannelEntry, api: OpenClawPluginApi): void {
+  entry.register(api);
+}
+
+const channelPlugins: Record<SupportedChannel, { register: (api: OpenClawPluginApi) => void }> = {
   dingtalk: {
-    register: (api: MoltbotPluginApi) => {
-      dingtalkEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(dingtalkEntry as ChannelEntry, api);
     },
   },
   "feishu-china": {
-    register: (api: MoltbotPluginApi) => {
-      feishuEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(feishuEntry as ChannelEntry, api);
     },
   },
   wecom: {
-    register: (api: MoltbotPluginApi) => {
-      wecomEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(wecomEntry as ChannelEntry, api);
     },
   },
   "wecom-app": {
-    register: (api: MoltbotPluginApi) => {
-      wecomAppEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(wecomAppEntry as ChannelEntry, api);
     },
   },
   "wecom-kf": {
-    register: (api: MoltbotPluginApi) => {
-      wecomKfEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(wecomKfEntry as ChannelEntry, api);
     },
   },
   "wechat-mp": {
-    register: (api: MoltbotPluginApi) => {
-      wechatMpEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(wechatMpEntry as ChannelEntry, api);
     },
   },
   qqbot: {
-    register: (api: MoltbotPluginApi) => {
-      qqbotEntry.register(api);
+    register: (api: OpenClawPluginApi) => {
+      registerChannelEntry(qqbotEntry as ChannelEntry, api);
     },
   },
 };
@@ -313,7 +304,7 @@ const channelPlugins: Record<SupportedChannel, { register: (api: MoltbotPluginAp
  * ```
  */
 export function registerChannelsByConfig(
-  api: MoltbotPluginApi,
+  api: OpenClawPluginApi,
   cfg?: MoltbotConfig
 ): void {
   // 从 api.config 或传入的 cfg 获取配置
@@ -344,27 +335,21 @@ export function registerChannelsByConfig(
  * 包含所有支持的渠道，通过配置启用
  * 配置路径符合 Moltbot 官方约定: channels.<id>
  */
-const channelsPlugin = {
+const channelsPlugin = definePluginEntry({
   id: "channels",
-  name: "Moltbot China Channels",
+  name: "OpenClaw China Channels",
   description: "统一渠道包，支持钉钉、飞书、企业微信、微信公众号、QQ Bot",
-
-  configSchema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {},
-  },
-
+  configSchema: emptyPluginConfigSchema(),
   /**
    * 注册所有启用的渠道
    *
    * 从 api.config.channels.<id>.enabled 读取配置
    */
-  register(api: MoltbotPluginApi) {
+  register(api: OpenClawPluginApi) {
     registerChinaSetupCli(api, { channels: SUPPORTED_CHANNELS });
     showChinaInstallHint(api);
-    registerChannelsByConfig(api);
+    registerChannelsByConfig(api, api.config as MoltbotConfig | undefined);
   },
-};
+});
 
 export default channelsPlugin;

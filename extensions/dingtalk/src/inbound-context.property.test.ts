@@ -297,8 +297,8 @@ describe("Feature: dingtalk-media-receive, Property 11: InboundContext field ass
         );
 
         // MediaUrl and MediaUrls should NOT be set (Requirement 7.8)
-        expect((resultCtx as Record<string, unknown>).MediaUrl).toBeUndefined();
-        expect((resultCtx as Record<string, unknown>).MediaUrls).toBeUndefined();
+        expect((resultCtx as unknown as Record<string, unknown>).MediaUrl).toBeUndefined();
+        expect((resultCtx as unknown as Record<string, unknown>).MediaUrls).toBeUndefined();
       }),
       { numRuns: 100 }
     );
@@ -420,4 +420,3 @@ describe("Feature: dingtalk-media-receive, Property 11: InboundContext field ass
     );
   });
 });
-

@@ -1,6 +1,7 @@
 import { TOPIC_ROBOT, type DWClient, type DWClientDownStream } from "dingtalk-stream";
 import { handleDingtalkMessage } from "./bot-handler.js";
 import {
+  type DingtalkConfig,
   mergeDingtalkAccountConfig,
   type PluginConfig,
 } from "./config.js";

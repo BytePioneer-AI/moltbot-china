@@ -1,110 +1,109 @@
-/**
- * 钉钉 Onboarding 适配器
- *
- * 实现 ChannelOnboardingAdapter 接口，提供:
- * - getStatus: 获取渠道配置状态
- * - configure: 交互式配置向导
- * - dmPolicy: DM 策略配置
- * - disable: 禁用渠道
- */
-
-import { DEFAULT_ACCOUNT_ID } from "./channel.js";
 import {
-  isConfigured,
+  DEFAULT_ACCOUNT_ID,
+  splitSetupEntries,
+  type ChannelSetupDmPolicy,
+  type ChannelSetupWizard,
+  type OpenClawConfig,
+  type WizardPrompter,
+} from "openclaw/plugin-sdk/setup";
+import {
   listDingtalkAccountIds,
   mergeDingtalkAccountConfig,
+  moveDingtalkSingleAccountConfigToDefaultAccount,
+  normalizeAccountId,
   resolveDefaultDingtalkAccountId,
   resolveDingtalkCredentials,
   type DingtalkConfig,
+  type PluginConfig,
 } from "./config.js";
 
-/**
- * 配置接口类型
- */
-export interface PluginConfig {
-  channels?: {
-    dingtalk?: Partial<DingtalkConfig>;
-  };
-}
-
-/**
- * WizardPrompter 接口（简化版）
- */
-export interface WizardPrompter {
-  note: (message: string, title?: string) => Promise<void>;
-  text: (opts: {
-    message: string;
-    placeholder?: string;
-    initialValue?: string;
-    validate?: (value: string | undefined) => string | undefined;
-  }) => Promise<string | symbol>;
-  confirm: (opts: { message: string; initialValue?: boolean }) => Promise<boolean>;
-  select: <T>(opts: {
-    message: string;
-    options: Array<{ value: T; label: string }>;
-    initialValue?: T;
-  }) => Promise<T | symbol>;
-}
-
-/**
- * DM 策略类型
- */
 type DmPolicy = "open" | "pairing" | "allowlist";
+type GroupPolicy = "open" | "allowlist" | "disabled";
 
-/**
- * 设置钉钉 DM 策略
- */
-function setDingtalkDmPolicy(cfg: PluginConfig, dmPolicy: DmPolicy): PluginConfig {
-  return {
-    ...cfg,
-    channels: {
-      ...cfg.channels,
-      dingtalk: {
-        ...cfg.channels?.dingtalk,
-        dmPolicy,
-      },
-    },
-  };
+function canStoreDefaultAccountInAccounts(cfg: PluginConfig): boolean {
+  return Boolean(cfg.channels?.dingtalk?.accounts?.[DEFAULT_ACCOUNT_ID]);
 }
 
-/**
- * 设置钉钉白名单
- */
-function setDingtalkAllowFrom(cfg: PluginConfig, allowFrom: string[]): PluginConfig {
-  return {
-    ...cfg,
-    channels: {
-      ...cfg.channels,
-      dingtalk: {
-        ...cfg.channels?.dingtalk,
-        allowFrom,
+function applyDingtalkAccountPatch(
+  cfg: PluginConfig,
+  accountId: string,
+  patch: Record<string, unknown>,
+): OpenClawConfig {
+  const seededCfg = moveDingtalkSingleAccountConfigToDefaultAccount(cfg);
+  const existing = seededCfg.channels?.dingtalk ?? {};
+
+  if (accountId === DEFAULT_ACCOUNT_ID && !canStoreDefaultAccountInAccounts(seededCfg)) {
+    return {
+      ...seededCfg,
+      channels: {
+        ...seededCfg.channels,
+        dingtalk: {
+          ...existing,
+          ...patch,
+          enabled: true,
+        } as DingtalkConfig,
       },
+    } as OpenClawConfig;
+  }
+
+  const accounts = (existing as DingtalkConfig).accounts ?? {};
+  return {
+    ...seededCfg,
+    channels: {
+      ...seededCfg.channels,
+      dingtalk: {
+        ...existing,
+        enabled: true,
+        accounts: {
+          ...accounts,
+          [accountId]: {
+            ...accounts[accountId],
+            ...patch,
+            enabled: true,
+          },
+        },
+      } as DingtalkConfig,
     },
-  };
+  } as OpenClawConfig;
 }
 
-/**
- * 解析白名单输入
- */
+function setDingtalkDmPolicy(cfg: OpenClawConfig, accountId: string, dmPolicy: DmPolicy): OpenClawConfig {
+  return applyDingtalkAccountPatch(cfg as PluginConfig, accountId, { dmPolicy });
+}
+
+function setDingtalkAllowFrom(
+  cfg: OpenClawConfig,
+  accountId: string,
+  allowFrom: string[],
+): OpenClawConfig {
+  return applyDingtalkAccountPatch(cfg as PluginConfig, accountId, { allowFrom });
+}
+
+function setDingtalkGroupPolicy(
+  cfg: OpenClawConfig,
+  accountId: string,
+  groupPolicy: GroupPolicy,
+): OpenClawConfig {
+  return applyDingtalkAccountPatch(cfg as PluginConfig, accountId, { groupPolicy });
+}
+
 function parseAllowFromInput(raw: string): string[] {
-  return raw
-    .split(/[\n,;]+/g)
+  return splitSetupEntries(raw)
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
 
-/**
- * 提示输入钉钉白名单
- */
 async function promptDingtalkAllowFrom(params: {
-  cfg: PluginConfig;
+  cfg: OpenClawConfig;
   prompter: WizardPrompter;
-}): Promise<PluginConfig> {
-  const existing = params.cfg.channels?.dingtalk?.allowFrom ?? [];
+  accountId: string;
+}): Promise<OpenClawConfig> {
+  const account = mergeDingtalkAccountConfig(params.cfg as PluginConfig, params.accountId);
+  const existing = account.allowFrom ?? [];
+
   await params.prompter.note(
     [
       "通过 staffId 或 unionId 设置钉钉私聊白名单。",
-      "你可以在钉钉开放平台或通过 API 获取用户 ID。",
       "示例:",
       "- manager1234",
       "- 0123456789012345678",
@@ -112,286 +111,180 @@ async function promptDingtalkAllowFrom(params: {
     "钉钉白名单",
   );
 
-  while (true) {
-    const entry = await params.prompter.text({
-      message: "钉钉白名单 (用户 ID)",
-      placeholder: "user1, user2",
-      initialValue: existing[0] ? String(existing[0]) : undefined,
-      validate: (value) => (String(value ?? "").trim() ? undefined : "必填"),
-    });
+  const entry = await params.prompter.text({
+    message: "钉钉 allowFrom (用户 ID)",
+    placeholder: "user1, user2",
+    initialValue: existing[0] ? String(existing[0]) : undefined,
+    validate: (value) => (String(value ?? "").trim() ? undefined : "必填"),
+  });
 
-    if (typeof entry === "symbol") {
-      return params.cfg;
-    }
+  const unique = [
+    ...new Set([
+      ...existing.map((value) => String(value).trim()).filter(Boolean),
+      ...parseAllowFromInput(String(entry)),
+    ]),
+  ];
 
-    const parts = parseAllowFromInput(String(entry));
-    if (parts.length === 0) {
-      await params.prompter.note("请至少输入一个用户 ID。", "钉钉白名单");
-      continue;
-    }
-
-    const unique = [
-      ...new Set([...existing.map((v) => String(v).trim()).filter(Boolean), ...parts]),
-    ];
-    return setDingtalkAllowFrom(params.cfg, unique);
-  }
+  return setDingtalkAllowFrom(params.cfg, params.accountId, unique);
 }
 
-/**
- * 显示钉钉凭证帮助信息
- */
 async function noteDingtalkCredentialHelp(prompter: WizardPrompter): Promise<void> {
   await prompter.note(
     [
       "1) 访问钉钉开放平台 (open.dingtalk.com)",
       "2) 创建企业内部应用",
-      "3) 在「凭证与基础信息」页面获取 AppKey 和 AppSecret",
+      "3) 在「凭证与基础信息」中获取 AppKey 和 AppSecret",
       "4) 在「机器人与消息推送」中启用机器人能力",
-      "5) 选择「Stream 模式」接收消息",
-      "6) 发布应用或添加到测试群",
-      "",
-      "提示: 也可以设置环境变量 DINGTALK_CLIENT_ID / DINGTALK_CLIENT_SECRET",
+      "5) 选择 Stream 或 Webhook 模式接收消息",
     ].join("\n"),
     "钉钉凭证配置",
   );
 }
 
-/**
- * 设置钉钉群聊策略
- */
-function setDingtalkGroupPolicy(
-  cfg: PluginConfig,
-  groupPolicy: "open" | "allowlist" | "disabled",
-): PluginConfig {
-  return {
-    ...cfg,
-    channels: {
-      ...cfg.channels,
-      dingtalk: {
-        ...cfg.channels?.dingtalk,
-        enabled: true,
-        groupPolicy,
-      },
-    },
-  };
-}
-
-/**
- * 设置钉钉群聊白名单
- */
-function setDingtalkGroupAllowFrom(cfg: PluginConfig, groupAllowFrom: string[]): PluginConfig {
-  return {
-    ...cfg,
-    channels: {
-      ...cfg.channels,
-      dingtalk: {
-        ...cfg.channels?.dingtalk,
-        groupAllowFrom,
-      },
-    },
-  };
-}
-
-/**
- * DM 策略配置
- */
-const dmPolicy = {
+const dingtalkDmPolicy: ChannelSetupDmPolicy = {
   label: "DingTalk",
-  channel: "dingtalk" as const,
+  channel: "dingtalk",
   policyKey: "channels.dingtalk.dmPolicy",
   allowFromKey: "channels.dingtalk.allowFrom",
-  getCurrent: (cfg: PluginConfig) =>
-    (cfg.channels?.dingtalk as DingtalkConfig | undefined)?.dmPolicy ?? "open",
-  setPolicy: (cfg: PluginConfig, policy: DmPolicy) => setDingtalkDmPolicy(cfg, policy),
-  promptAllowFrom: promptDingtalkAllowFrom,
-};
-
-/**
- * 钉钉 Onboarding 适配器
- */
-export const dingtalkOnboardingAdapter = {
-  channel: "dingtalk" as const,
-
-  /**
-   * 获取渠道配置状态
-   */
-  getStatus: async (params: { cfg: PluginConfig }) => {
-    const accountIds = listDingtalkAccountIds(params.cfg);
-    const configuredAccountId = accountIds.find((accountId) =>
-      isConfigured(mergeDingtalkAccountConfig(params.cfg, accountId))
-    );
-    const configured = Boolean(configuredAccountId);
-    const defaultAccountId = resolveDefaultDingtalkAccountId(params.cfg);
-
-    const statusLines: string[] = [];
-    if (!configured) {
-      statusLines.push("钉钉: 需要配置应用凭证");
-    } else {
-      statusLines.push(
-        configuredAccountId && configuredAccountId !== DEFAULT_ACCOUNT_ID
-          ? `钉钉: 已配置 (${configuredAccountId})`
-          : `钉钉: 已配置${defaultAccountId !== DEFAULT_ACCOUNT_ID ? ` (default=${defaultAccountId})` : ""}`
-      );
+  resolveConfigKeys: (_cfg, accountId) => {
+    const normalized = normalizeAccountId(accountId);
+    if (normalized === DEFAULT_ACCOUNT_ID) {
+      return {
+        policyKey: "channels.dingtalk.dmPolicy",
+        allowFromKey: "channels.dingtalk.allowFrom",
+      };
     }
-
     return {
-      channel: "dingtalk" as const,
-      configured,
-      statusLines,
-      selectionHint: configured ? "已配置" : "需要应用凭证",
-      quickstartScore: configured ? 2 : 0,
+      policyKey: `channels.dingtalk.accounts.${normalized}.dmPolicy`,
+      allowFromKey: `channels.dingtalk.accounts.${normalized}.allowFrom`,
     };
   },
+  getCurrent: (cfg, accountId) =>
+    mergeDingtalkAccountConfig(cfg as PluginConfig, normalizeAccountId(accountId)).dmPolicy ?? "open",
+  setPolicy: (cfg, policy, accountId) =>
+    setDingtalkDmPolicy(
+      cfg,
+      normalizeAccountId(accountId),
+      policy === "pairing" || policy === "allowlist" ? policy : "open",
+    ),
+  promptAllowFrom: async ({ cfg, prompter, accountId }) =>
+    await promptDingtalkAllowFrom({
+      cfg,
+      prompter,
+      accountId: normalizeAccountId(accountId),
+    }),
+};
 
-  /**
-   * 交互式配置向导
-   */
-  configure: async (params: { cfg: PluginConfig; prompter: WizardPrompter }) => {
-    const defaultAccountId = resolveDefaultDingtalkAccountId(params.cfg);
-    const dingtalkCfg =
-      mergeDingtalkAccountConfig(params.cfg, defaultAccountId) as DingtalkConfig | undefined;
-    const resolved = resolveDingtalkCredentials(dingtalkCfg);
-    const hasConfigCreds = Boolean(
-      dingtalkCfg?.clientId?.trim() && dingtalkCfg?.clientSecret?.trim()
-    );
-    const canUseEnv = Boolean(
-      !hasConfigCreds &&
-        process.env.DINGTALK_CLIENT_ID?.trim() &&
-        process.env.DINGTALK_CLIENT_SECRET?.trim()
-    );
+function isDingtalkConfigured(cfg: OpenClawConfig): boolean {
+  return listDingtalkAccountIds(cfg as PluginConfig).some((accountId) =>
+    Boolean(resolveDingtalkCredentials(mergeDingtalkAccountConfig(cfg as PluginConfig, accountId))),
+  );
+}
 
-    let next = params.cfg;
-    let clientId: string | null = null;
-    let clientSecret: string | null = null;
+export const dingtalkSetupWizard: ChannelSetupWizard = {
+  channel: "dingtalk",
+  status: {
+    configuredLabel: "configured",
+    unconfiguredLabel: "needs app credentials",
+    configuredHint: "已配置",
+    unconfiguredHint: "需要应用凭证",
+    configuredScore: 2,
+    unconfiguredScore: 0,
+    resolveConfigured: ({ cfg }) => isDingtalkConfigured(cfg),
+    resolveStatusLines: ({ cfg, configured }) => {
+      if (!configured) {
+        return ["DingTalk: 需要配置应用凭证"];
+      }
+      const defaultAccountId = resolveDefaultDingtalkAccountId(cfg as PluginConfig);
+      return [
+        defaultAccountId === DEFAULT_ACCOUNT_ID
+          ? "DingTalk: 已配置"
+          : `DingTalk: 已配置 (default=${defaultAccountId})`,
+      ];
+    },
+  },
+  credentials: [],
+  resolveAccountIdForConfigure: ({ accountOverride, cfg }) =>
+    normalizeAccountId(accountOverride ?? resolveDefaultDingtalkAccountId(cfg as PluginConfig)),
+  finalize: async ({ cfg, accountId, prompter }) => {
+    const resolvedAccountId = normalizeAccountId(accountId);
+    const current = mergeDingtalkAccountConfig(cfg as PluginConfig, resolvedAccountId);
+    let next = cfg;
 
-    if (!resolved) {
-      await noteDingtalkCredentialHelp(params.prompter);
+    if (!resolveDingtalkCredentials(current)) {
+      await noteDingtalkCredentialHelp(prompter);
     }
 
-    if (canUseEnv) {
-      const keepEnv = await params.prompter.confirm({
-        message: "检测到 DINGTALK_CLIENT_ID + DINGTALK_CLIENT_SECRET 环境变量，是否使用？",
-        initialValue: true,
-      });
-      if (keepEnv) {
-        next = {
-          ...next,
-          channels: {
-            ...next.channels,
-            dingtalk: { ...next.channels?.dingtalk, enabled: true },
-          },
-        };
-      } else {
-        const idResult = await params.prompter.text({
-          message: "请输入钉钉 AppKey (clientId)",
-          validate: (value) => (value?.trim() ? undefined : "必填"),
-        });
-        if (typeof idResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-        clientId = String(idResult).trim();
-
-        const secretResult = await params.prompter.text({
-          message: "请输入钉钉 AppSecret (clientSecret)",
-          validate: (value) => (value?.trim() ? undefined : "必填"),
-        });
-        if (typeof secretResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-        clientSecret = String(secretResult).trim();
-      }
-    } else if (hasConfigCreds) {
-      const keep = await params.prompter.confirm({
+    let shouldKeepExisting = false;
+    if (resolveDingtalkCredentials(current)) {
+      shouldKeepExisting = await prompter.confirm({
         message: "钉钉凭证已配置，是否保留？",
         initialValue: true,
       });
-      if (!keep) {
-        const idResult = await params.prompter.text({
+    }
+
+    if (!shouldKeepExisting) {
+      const clientId = String(
+        await prompter.text({
           message: "请输入钉钉 AppKey (clientId)",
+          initialValue: current.clientId,
           validate: (value) => (value?.trim() ? undefined : "必填"),
-        });
-        if (typeof idResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-        clientId = String(idResult).trim();
+        }),
+      ).trim();
 
-        const secretResult = await params.prompter.text({
+      const clientSecret = String(
+        await prompter.text({
           message: "请输入钉钉 AppSecret (clientSecret)",
+          initialValue: current.clientSecret,
           validate: (value) => (value?.trim() ? undefined : "必填"),
-        });
-        if (typeof secretResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-        clientSecret = String(secretResult).trim();
-      }
-    } else {
-      const idResult = await params.prompter.text({
-        message: "请输入钉钉 AppKey (clientId)",
-        validate: (value) => (value?.trim() ? undefined : "必填"),
-      });
-      if (typeof idResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-      clientId = String(idResult).trim();
+        }),
+      ).trim();
 
-      const secretResult = await params.prompter.text({
-        message: "请输入钉钉 AppSecret (clientSecret)",
-        validate: (value) => (value?.trim() ? undefined : "必填"),
+      next = applyDingtalkAccountPatch(next as PluginConfig, resolvedAccountId, {
+        clientId,
+        clientSecret,
       });
-      if (typeof secretResult === "symbol") return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-      clientSecret = String(secretResult).trim();
     }
 
-    if (clientId && clientSecret) {
-      next = {
-        ...next,
-        channels: {
-          ...next.channels,
-          dingtalk: {
-            ...next.channels?.dingtalk,
-            enabled: true,
-            clientId,
-            clientSecret,
-          },
-        },
-      };
-    }
+    const connectionMode = (await prompter.select({
+      message: "钉钉连接模式",
+      options: [
+        { value: "stream", label: "Stream" },
+        { value: "webhook", label: "Webhook" },
+      ],
+      initialValue: current.connectionMode ?? "stream",
+    })) as "stream" | "webhook";
+    next = applyDingtalkAccountPatch(next as PluginConfig, resolvedAccountId, { connectionMode });
 
-    // AI Card 配置
-    const enableAICard = await params.prompter.confirm({
-      message: "是否启用 AI Card 流式响应？（直接回车使用推荐值）",
-      initialValue: false,
+    const enableAICard = await prompter.confirm({
+      message: "是否启用 AI Card 流式响应？",
+      initialValue: current.enableAICard ?? false,
     });
-    next = {
-      ...next,
+    next = applyDingtalkAccountPatch(next as PluginConfig, resolvedAccountId, { enableAICard });
+
+    const groupPolicy = (await prompter.select({
+      message: "群聊策略",
+      options: [
+        { value: "open", label: "开放" },
+        { value: "allowlist", label: "白名单" },
+        { value: "disabled", label: "禁用" },
+      ],
+      initialValue: current.groupPolicy ?? "open",
+    })) as GroupPolicy;
+    next = setDingtalkGroupPolicy(next, resolvedAccountId, groupPolicy);
+
+    return { cfg: next };
+  },
+  dmPolicy: dingtalkDmPolicy,
+  disable: (cfg) =>
+    ({
+      ...cfg,
       channels: {
-        ...next.channels,
+        ...cfg.channels,
         dingtalk: {
-          ...next.channels?.dingtalk,
-          enableAICard,
+          ...cfg.channels?.dingtalk,
+          enabled: false,
         },
       },
-    };
-
-    // 群聊策略
-    const groupPolicyResult = await params.prompter.select({
-      message: "群聊策略（直接回车使用默认值「开放」）",
-      options: [
-        { value: "open", label: "开放 - 响应所有群聊（需要 @机器人）【推荐】" },
-        { value: "allowlist", label: "白名单 - 仅响应指定群聊" },
-        { value: "disabled", label: "禁用 - 不响应群聊" },
-      ],
-      initialValue:
-        (next.channels?.dingtalk as DingtalkConfig | undefined)?.groupPolicy ?? "open",
-    });
-
-    if (typeof groupPolicyResult !== "symbol") {
-      next = setDingtalkGroupPolicy(next, groupPolicyResult as "open" | "allowlist" | "disabled");
-    }
-
-    return { cfg: next, accountId: DEFAULT_ACCOUNT_ID };
-  },
-
-  dmPolicy,
-
-  /**
-   * 禁用渠道
-   */
-  disable: (cfg: PluginConfig): PluginConfig => ({
-    ...cfg,
-    channels: {
-      ...cfg.channels,
-      dingtalk: { ...cfg.channels?.dingtalk, enabled: false },
-    },
-  }),
+    }) as OpenClawConfig,
 };

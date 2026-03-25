@@ -98,6 +98,21 @@ openclaw china setup
 
 ## 三、配置与启动
 
+### 新版 SDK 适配说明
+
+当前钉钉插件已经对齐到新版 OpenClaw plugin SDK 集成方式：
+
+- 入口改为官方 `defineChannelPluginEntry(...)`
+- 提供 `setup-entry.ts`，支持 setup-only 轻量加载
+- 通过官方 runtime store 注入宿主 runtime
+- 已接入共享 `message` 工具的 `send` 动作发现与执行
+
+这意味着：
+
+- 继续使用 `openclaw china setup` 即可完成配置
+- 现有 `channels.dingtalk` 配置结构保持兼容
+- 插件内部与 OpenClaw 主线的集成契约更稳定，后续升级成本更低
+
 ### 1. 配置钉钉渠道
 
 > 推荐使用「配置向导」：`openclaw china setup`

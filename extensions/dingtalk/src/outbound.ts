@@ -12,14 +12,16 @@
  * - chunkerMode: "markdown" (使用 markdown 感知的分块模式)
  */
 
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import { sendMessageDingtalk } from "./send.js";
 import { sendMediaDingtalk } from "./media.js";
 import { getDingtalkRuntime } from "./runtime.js";
 import {
   mergeDingtalkAccountConfig,
   resolveDingtalkAccountId,
-  type PluginConfig as OutboundConfig,
+  type PluginConfig,
 } from "./config.js";
+import { parseDingtalkSendTarget } from "./targets.js";
 
 /**
  * 发送结果类型
@@ -30,20 +32,6 @@ export interface SendResult {
   chatId?: string;
   conversationId?: string;
 }
-
-/**
- * 解析目标 ID 和聊天类型
- */
-function parseTarget(to: string): { targetId: string; chatType: "direct" | "group" } {
-  if (to.startsWith("chat:")) {
-    return { targetId: to.slice(5), chatType: "group" };
-  }
-  if (to.startsWith("user:")) {
-    return { targetId: to.slice(5), chatType: "direct" };
-  }
-  return { targetId: to, chatType: "direct" };
-}
-
 
 /**
  * 钉钉出站适配器
@@ -78,7 +66,7 @@ export const dingtalkOutbound = {
    * 发送文本消息
    */
   sendText: async (params: {
-    cfg: OutboundConfig;
+    cfg: OpenClawConfig;
     to: string;
     text: string;
     accountId?: string;
@@ -89,17 +77,20 @@ export const dingtalkOutbound = {
       throw new Error("DingTalk channel not configured");
     }
     const dingtalkCfg = mergeDingtalkAccountConfig(
-      cfg,
-      resolveDingtalkAccountId(cfg, accountId)
+      cfg as PluginConfig,
+      resolveDingtalkAccountId(cfg as PluginConfig, accountId)
     );
 
-    const { targetId, chatType } = parseTarget(to);
+    const resolvedTarget = parseDingtalkSendTarget(to);
+    if (!resolvedTarget) {
+      throw new Error(`Invalid DingTalk target: ${to}`);
+    }
 
     const result = await sendMessageDingtalk({
       cfg: dingtalkCfg,
-      to: targetId,
+      to: resolvedTarget.targetId,
       text,
-      chatType,
+      chatType: resolvedTarget.chatType,
     });
 
     return {
@@ -114,7 +105,7 @@ export const dingtalkOutbound = {
    * 发送媒体消息（含回退逻辑）
    */
   sendMedia: async (params: {
-    cfg: OutboundConfig;
+    cfg: OpenClawConfig;
     to: string;
     text?: string;
     mediaUrl?: string;
@@ -126,19 +117,22 @@ export const dingtalkOutbound = {
       throw new Error("DingTalk channel not configured");
     }
     const dingtalkCfg = mergeDingtalkAccountConfig(
-      cfg,
-      resolveDingtalkAccountId(cfg, accountId)
+      cfg as PluginConfig,
+      resolveDingtalkAccountId(cfg as PluginConfig, accountId)
     );
 
-    const { targetId, chatType } = parseTarget(to);
+    const resolvedTarget = parseDingtalkSendTarget(to);
+    if (!resolvedTarget) {
+      throw new Error(`Invalid DingTalk target: ${to}`);
+    }
 
     // 先发送文本（如果有）
     if (text?.trim()) {
       await sendMessageDingtalk({
         cfg: dingtalkCfg,
-        to: targetId,
+        to: resolvedTarget.targetId,
         text,
-        chatType,
+        chatType: resolvedTarget.chatType,
       });
     }
 
@@ -147,9 +141,9 @@ export const dingtalkOutbound = {
       try {
         const result = await sendMediaDingtalk({
           cfg: dingtalkCfg,
-          to: targetId,
+          to: resolvedTarget.targetId,
           mediaUrl,
-          chatType,
+          chatType: resolvedTarget.chatType,
         });
 
         return {
@@ -165,9 +159,9 @@ export const dingtalkOutbound = {
         const fallbackText = `📎 ${mediaUrl}`;
         const result = await sendMessageDingtalk({
           cfg: dingtalkCfg,
-          to: targetId,
+          to: resolvedTarget.targetId,
           text: fallbackText,
-          chatType,
+          chatType: resolvedTarget.chatType,
         });
 
         return {
@@ -183,8 +177,8 @@ export const dingtalkOutbound = {
     return {
       channel: "dingtalk",
       messageId: text?.trim() ? `text_${Date.now()}` : "empty",
-      chatId: targetId,
-      conversationId: targetId,
+      chatId: resolvedTarget.targetId,
+      conversationId: resolvedTarget.targetId,
     };
   },
 };

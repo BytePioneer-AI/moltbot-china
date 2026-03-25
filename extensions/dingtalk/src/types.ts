@@ -122,10 +122,14 @@ export interface DingtalkSendResult {
 export interface ResolvedDingtalkAccount {
   /** 账户 ID */
   accountId: string;
+  /** 账户显示名 */
+  name?: string;
   /** 是否启用 */
   enabled: boolean;
   /** 是否已配置（有凭证） */
   configured: boolean;
   /** 客户端 ID */
   clientId?: string;
+  /** 合并后的账户配置 */
+  config: DingtalkAccountConfig;
 }

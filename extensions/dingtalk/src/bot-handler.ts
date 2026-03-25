@@ -45,6 +45,7 @@ import {
   finalizeInboundMediaFile,
   pruneInboundMediaDir,
 } from "@openclaw-china/shared";
+import { buildDingtalkConversationTarget } from "./targets.js";
 
 export const LONG_TASK_NOTICE_TEXT = "任务处理时间较长，请稍等，我还在继续处理。";
 export const DEFAULT_LONG_TASK_NOTICE_DELAY_MS = 30000;
@@ -648,9 +649,7 @@ export function buildInboundContext(
   const from = isGroup
     ? `dingtalk:group:${ctx.conversationId}`
     : `dingtalk:${ctx.senderId}`;
-  const to = isGroup
-    ? `chat:${ctx.conversationId}`
-    : `user:${ctx.senderId}`;
+  const to = buildDingtalkConversationTarget(ctx.chatType, isGroup ? ctx.conversationId : ctx.senderId);
   
   return {
     Body: ctx.content,
@@ -685,9 +684,7 @@ function buildTargetMeta(
   const from = isGroup
     ? `dingtalk:group:${ctx.conversationId}`
     : `dingtalk:${ctx.senderId}`;
-  const to = isGroup
-    ? `chat:${ctx.conversationId}`
-    : `user:${ctx.senderId}`;
+  const to = buildDingtalkConversationTarget(ctx.chatType, isGroup ? ctx.conversationId : ctx.senderId);
 
   return {
     chatType: ctx.chatType,
@@ -1266,10 +1263,12 @@ export async function handleDingtalkMessage(params: {
           }) => Promise<void>;
         }
       | undefined;
-    const storePath = channelSession?.resolveStorePath?.(
-      (cfg as Record<string, unknown>)?.session?.store,
-      { agentId: (route as Record<string, unknown>)?.agentId as string | undefined },
-    );
+    const sessionConfig = (cfg as Record<string, unknown>)?.session as
+      | { store?: unknown }
+      | undefined;
+    const storePath = channelSession?.resolveStorePath?.(sessionConfig?.store, {
+      agentId: (route as Record<string, unknown>)?.agentId as string | undefined,
+    });
     if (channelSession?.recordInboundSession && storePath) {
       const mainSessionKeyRaw = (route as Record<string, unknown>)?.mainSessionKey;
       const mainSessionKey =
