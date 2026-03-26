@@ -11,11 +11,16 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
+import {
+  defineChannelPluginEntry,
+  type OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
+
+import { registerChinaSetupCli, showChinaInstallHint } from "@openclaw-china/shared";
 
 import { wecomAppPlugin, DEFAULT_ACCOUNT_ID } from "./src/channel.js";
 import { setWecomAppRuntime, getWecomAppRuntime } from "./src/runtime.js";
 import { handleWecomAppWebhookRequest } from "./src/monitor.js";
-import { registerChinaSetupCli, showChinaInstallHint } from "@openclaw-china/shared";
 import {
   sendWecomAppMessage,
   sendWecomAppMarkdownMessage,
@@ -25,9 +30,6 @@ import {
   clearAllAccessTokenCache,
 } from "./src/api.js";
 
-/**
- * Moltbot 插件 API 接口
- */
 type HttpRouteMatch = "exact" | "prefix";
 type HttpRouteAuth = "gateway" | "plugin";
 
@@ -48,18 +50,15 @@ type WecomAppRouteConfig = {
   >;
 };
 
-export interface MoltbotPluginApi {
-  registerChannel: (opts: { plugin: unknown }) => void;
-  registerHttpHandler?: (handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean> | boolean) => void;
+type LegacyHttpHandlerApi = Omit<OpenClawPluginApi, "registerHttpRoute"> & {
   registerHttpRoute?: (params: HttpRouteParams) => void;
+  registerHttpHandler?: (handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean> | boolean) => void;
   config?: {
     channels?: {
       "wecom-app"?: WecomAppRouteConfig;
     };
   };
-  runtime?: unknown;
-  [key: string]: unknown;
-}
+};
 
 function normalizeRoutePath(path: string | undefined, fallback: string): string {
   const trimmed = path?.trim() ?? "";
@@ -115,38 +114,42 @@ export type {
   AccessTokenCacheEntry,
 } from "./src/types.js";
 
-const plugin = {
+const baseEntry = defineChannelPluginEntry({
   id: "wecom-app",
   name: "WeCom App",
   description: "企业微信自建应用插件，支持主动发送消息",
-  configSchema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {},
-  },
-  register(api: MoltbotPluginApi) {
+  plugin: wecomAppPlugin,
+  setRuntime: setWecomAppRuntime,
+  registerFull(api) {
     registerChinaSetupCli(api, { channels: ["wecom-app"] });
     showChinaInstallHint(api);
 
-    if (api.runtime) {
-      setWecomAppRuntime(api.runtime as Record<string, unknown>);
-    }
+    const routeApi = api as LegacyHttpHandlerApi;
+    const routeConfig = api.config?.channels?.["wecom-app"] as WecomAppRouteConfig | undefined;
 
-    api.registerChannel({ plugin: wecomAppPlugin });
-
-    if (api.registerHttpRoute) {
-      for (const path of collectWecomAppRoutePaths(api.config?.channels?.["wecom-app"])) {
-        api.registerHttpRoute({
+    if (typeof routeApi.registerHttpRoute === "function") {
+      for (const path of collectWecomAppRoutePaths(routeConfig)) {
+        routeApi.registerHttpRoute({
           path,
           auth: "plugin",
           match: "prefix",
           handler: handleWecomAppWebhookRequest,
         });
       }
-    } else if (api.registerHttpHandler) {
-      // Backward compatibility for older OpenClaw core
-      api.registerHttpHandler(handleWecomAppWebhookRequest);
+    } else if (typeof routeApi.registerHttpHandler === "function") {
+      // Preserve legacy host shims while migrating to the latest SDK entry.
+      routeApi.registerHttpHandler(handleWecomAppWebhookRequest);
     }
+  },
+});
+
+const plugin = {
+  ...baseEntry,
+  register(api: LegacyHttpHandlerApi) {
+    baseEntry.register({
+      ...api,
+      registrationMode: api.registrationMode ?? "full",
+    } as OpenClawPluginApi);
   },
 };
 

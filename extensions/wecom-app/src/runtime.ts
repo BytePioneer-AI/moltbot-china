@@ -2,6 +2,11 @@
  * 企业微信自建应用插件运行时管理
  */
 
+import {
+  createPluginRuntimeStore,
+  type PluginRuntime as OpenClawPluginRuntime,
+} from "openclaw/plugin-sdk/runtime-store";
+
 export interface PluginRuntime {
   log?: (msg: string) => void;
   error?: (msg: string) => void;
@@ -74,42 +79,43 @@ export interface PluginRuntime {
   [key: string]: unknown;
 }
 
-let runtime: PluginRuntime | null = null;
+const runtimeStore = createPluginRuntimeStore<PluginRuntime>(
+  "WeCom App runtime not initialized. Ensure the plugin is registered.",
+);
 
 /**
  * 设置企业微信自建应用运行时
  */
-export function setWecomAppRuntime(next: PluginRuntime): void {
-  runtime = next;
+export function setWecomAppRuntime(next: PluginRuntime): void;
+export function setWecomAppRuntime(next: OpenClawPluginRuntime): void;
+export function setWecomAppRuntime(next: OpenClawPluginRuntime | PluginRuntime): void {
+  runtimeStore.setRuntime(next as PluginRuntime);
 }
 
 /**
  * 获取企业微信自建应用运行时 (必须已初始化)
  */
 export function getWecomAppRuntime(): PluginRuntime {
-  if (!runtime) {
-    throw new Error("WeCom App runtime not initialized. Make sure the plugin is properly registered with Moltbot.");
-  }
-  return runtime;
+  return runtimeStore.getRuntime();
 }
 
 /**
  * 尝试获取企业微信自建应用运行时 (可能为 null)
  */
 export function tryGetWecomAppRuntime(): PluginRuntime | null {
-  return runtime;
+  return runtimeStore.tryGetRuntime();
 }
 
 /**
  * 检查运行时是否已初始化
  */
 export function isWecomAppRuntimeInitialized(): boolean {
-  return runtime !== null;
+  return runtimeStore.tryGetRuntime() !== null;
 }
 
 /**
  * 清除运行时
  */
 export function clearWecomAppRuntime(): void {
-  runtime = null;
+  runtimeStore.clearRuntime();
 }

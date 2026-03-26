@@ -1,10 +1,10 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["index.ts"],
+  entry: ["index.ts", "setup-entry.ts"],
   format: ["esm"],
   target: "es2022",
-  dts: { resolve: true },
+  dts: { resolve: false },
   sourcemap: true,
   clean: true,
   splitting: false,
