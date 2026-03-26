@@ -7,6 +7,8 @@
  * Requirements: Unified Package Entry, Unified Distribution
  */
 
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+
 // 导出 DingTalk 插件
 import {
   dingtalkPlugin,
@@ -241,6 +243,7 @@ export interface MoltbotPluginApi {
     };
   };
   config?: MoltbotConfig;
+  registrationMode?: OpenClawPluginApi["registrationMode"];
   [key: string]: unknown;
 }
 
@@ -369,8 +372,14 @@ const channelsPlugin = {
    * 从 api.config.channels.<id>.enabled 读取配置
    */
   register(api: MoltbotPluginApi) {
-    registerChinaSetupCli(api, { channels: SUPPORTED_CHANNELS });
-    showChinaInstallHint(api);
+    const registrationMode = api.registrationMode;
+    const isFullRegistration = registrationMode === undefined || registrationMode === "full";
+
+    if (isFullRegistration) {
+      registerChinaSetupCli(api, { channels: SUPPORTED_CHANNELS });
+      showChinaInstallHint(api);
+    }
+
     registerChannelsByConfig(api);
   },
 };

@@ -66,13 +66,18 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "openclaw": "^2026.3.23-2",
     "tsup": "^8.2.0",
     "typescript": "^5.7.0"
   },
   "peerDependencies": {
+    "openclaw": ">=2026.3.23-2",
     "moltbot": ">=0.1.0"
   },
   "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    },
     "moltbot": {
       "optional": true
     }
