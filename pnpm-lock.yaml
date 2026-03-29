@@ -233,13 +233,13 @@ importers:
         specifier: ^1.0.0
         version: 1.0.1
       '@openclaw-china/dingtalk':
-        specifier: workspace:*
+        specifier: 2026.3.9-1
         version: link:../../extensions/dingtalk
       '@openclaw-china/feishu-china':
-        specifier: workspace:*
+        specifier: 2026.3.9-1
         version: link:../../extensions/feishu
       '@openclaw-china/qqbot':
-        specifier: workspace:*
+        specifier: 2026.3.9-1
         version: link:../../extensions/qqbot
       '@openclaw-china/shared':
         specifier: workspace:*

@@ -45,6 +45,154 @@ import {
   uploadWecomWsLocalMedia,
 } from "./ws-gateway.js";
 
+// =============================================================================
+// Message Action Adapter Types and Helpers (OpenClaw 3.22+)
+// =============================================================================
+
+type WecomMessageActionName = "send" | "sendAttachment";
+
+interface WecomMessageToolResult {
+  ok: boolean;
+  messageId?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+interface WecomActionContext {
+  channel: string;
+  action: WecomMessageActionName;
+  params: Record<string, unknown>;
+  cfg: PluginConfig;
+  accountId?: string | null;
+  sessionKey?: string | null;
+  sessionId?: string | null;
+}
+
+function readStringParam(params: Record<string, unknown>, name: string, opts?: { required?: boolean; trim?: boolean }): string | undefined {
+  const value = params[name];
+  if (value === undefined || value === null) {
+    if (opts?.required) {
+      throw new Error(`wecom ${name} param is required`);
+    }
+    return undefined;
+  }
+  const str = String(value);
+  return opts?.trim ? str.trim() : str;
+}
+
+async function handleWecomMessageAction(
+  ctx: WecomActionContext,
+  outbound: {
+    sendText: (params: {
+      cfg: PluginConfig;
+      accountId?: string;
+      to: string;
+      text: string;
+      sessionKey?: string;
+      runId?: string;
+    }) => Promise<{ channel: string; ok: boolean; messageId: string; error?: Error }>;
+    sendMedia: (params: {
+      cfg: PluginConfig;
+      accountId?: string;
+      to: string;
+      mediaUrl: string;
+      text?: string;
+      mimeType?: string;
+      sessionKey?: string;
+      runId?: string;
+    }) => Promise<{ channel: string; ok: boolean; messageId: string; error?: Error }>;
+  }
+): Promise<WecomMessageToolResult> {
+  const { action, params, cfg, accountId, sessionKey, sessionId } = ctx;
+
+  const commonParams = {
+    cfg,
+    accountId: accountId ?? undefined,
+    sessionKey: sessionKey ?? undefined,
+    runId: sessionId ?? undefined,
+  };
+
+  if (action === "send") {
+    const to = readStringParam(params, "to", { required: true });
+    const message = readStringParam(params, "message", { required: false, trim: true }) ?? "";
+    const media = readStringParam(params, "media", { trim: false });
+
+    if (!to) {
+      return { ok: false, error: "wecom send requires 'to' param" };
+    }
+
+    if (media) {
+      const result = await outbound.sendMedia({
+        ...commonParams,
+        to,
+        mediaUrl: media,
+        text: message || undefined,
+      });
+      if (!result.ok) {
+        return { ok: false, error: result.error?.message ?? "sendMedia failed" };
+      }
+      return { ok: true, messageId: result.messageId };
+    } else {
+      const result = await outbound.sendText({
+        ...commonParams,
+        to,
+        text: message,
+      });
+      if (!result.ok) {
+        return { ok: false, error: result.error?.message ?? "sendText failed" };
+      }
+      return { ok: true, messageId: result.messageId };
+    }
+  }
+
+  if (action === "sendAttachment") {
+    const to = readStringParam(params, "to", { required: true });
+    const media = readStringParam(params, "media", { trim: false });
+    const caption = readStringParam(params, "caption", { required: false, trim: true });
+
+    if (!to) {
+      return { ok: false, error: "wecom sendAttachment requires 'to' param" };
+    }
+    if (!media) {
+      return { ok: false, error: "wecom sendAttachment requires 'media' param" };
+    }
+
+    const result = await outbound.sendMedia({
+      ...commonParams,
+      to,
+      mediaUrl: media,
+      text: caption,
+    });
+    if (!result.ok) {
+      return { ok: false, error: result.error?.message ?? "sendMedia failed" };
+    }
+    return { ok: true, messageId: result.messageId };
+  }
+
+  return { ok: false, error: `Unsupported wecom action: ${action}` };
+}
+
+function describeWecomMessageTool(): {
+  actions: WecomMessageActionName[];
+  capabilities: string[];
+  schema?: {
+    properties: Record<string, unknown>;
+    visibility?: "current-channel" | "all-configured";
+  };
+} {
+  return {
+    actions: ["send", "sendAttachment"],
+    capabilities: ["media"],
+    schema: {
+      properties: {
+        media: { type: "string", description: "Media file URL or local file path (for file/image/audio/video attachments)" },
+        caption: { type: "string", description: "Optional caption text for the media" },
+      },
+      visibility: "current-channel",
+    },
+  };
+}
+
 type ParsedDirectTarget = {
   accountId?: string;
   kind: "user" | "group";
@@ -982,6 +1130,19 @@ export const wecomPlugin = {
       stopWecomWsGatewayForAccount(ctx.accountId);
       ctx.setStatus?.({ accountId: ctx.accountId, running: false, lastStopAt: Date.now() });
     },
+  },
+
+  actions: {
+    describeMessageTool: () => describeWecomMessageTool(),
+    handleAction: async (ctx: {
+      channel: string;
+      action: string;
+      params: Record<string, unknown>;
+      cfg: PluginConfig;
+      accountId?: string | null;
+      sessionKey?: string | null;
+      sessionId?: string | null;
+    }) => handleWecomMessageAction(ctx as WecomActionContext, wecomPlugin.outbound),
   },
 };
 
